@@ -6,7 +6,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from planwise.core import project_retirement
+from planwise.core import (
+    ContributionRates,
+    InvestmentReturns,
+    UserProfile,
+    project_retirement,
+)
 
 
 class TestProjectRetirement:
@@ -14,25 +19,35 @@ class TestProjectRetirement:
 
     def test_basic_projection(self):
         """Test a basic retirement projection."""
-        result = project_retirement(
+        user = UserProfile(
             current_age=30,
-            retirement_age=35,  # Short period for testing
+            retirement_age=35,
             salary=40000,
-            lisa_contrib_rate=0.05,
-            isa_contrib_rate=0.05,
-            sipp_employee_rate=0.05,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.05,
-            workplace_employer_rate=0.03,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
             shift_lisa_to_isa=0.5,
             shift_lisa_to_sipp=0.5,
-            roi_lisa=0.05,
-            roi_isa=0.05,
-            roi_sipp=0.05,
-            roi_workplace=0.05,
+        )
+        returns = InvestmentReturns(
+            lisa=0.05,
+            isa=0.05,
+            sipp=0.05,
+            workplace=0.05,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=0.02,
-            scotland=False,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # Check basic structure
@@ -66,25 +81,35 @@ class TestProjectRetirement:
 
     def test_lisa_age_restriction(self):
         """Test that LISA contributions stop at age 50."""
-        result = project_retirement(
+        user = UserProfile(
             current_age=48,
             retirement_age=52,
             salary=40000,
-            lisa_contrib_rate=0.10,  # High rate to make it obvious
-            isa_contrib_rate=0.0,
-            sipp_employee_rate=0.0,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.0,
-            workplace_employer_rate=0.0,
-            shift_lisa_to_isa=1.0,  # All redirected to ISA after 50
-            shift_lisa_to_sipp=0.0,
-            roi_lisa=0.0,
-            roi_isa=0.0,
-            roi_sipp=0.0,
-            roi_workplace=0.0,
-            inflation=0.0,
             scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=1.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            inflation=0.0,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # Ages 48-49 should have LISA contributions
@@ -101,25 +126,35 @@ class TestProjectRetirement:
 
     def test_lisa_bonus_calculation(self):
         """Test LISA bonus is calculated correctly."""
-        result = project_retirement(
+        user = UserProfile(
             current_age=30,
             retirement_age=31,
             salary=40000,
-            lisa_contrib_rate=0.10,  # £4000 contribution
-            isa_contrib_rate=0.0,
-            sipp_employee_rate=0.0,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.0,
-            workplace_employer_rate=0.0,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
             shift_lisa_to_isa=0.0,
             shift_lisa_to_sipp=0.0,
-            roi_lisa=0.0,
-            roi_isa=0.0,
-            roi_sipp=0.0,
-            roi_workplace=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=0.0,
-            scotland=False,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         lisa_net = result.iloc[0]["LISA Net"]
@@ -131,28 +166,36 @@ class TestProjectRetirement:
 
     # def test_pension_annual_allowance_cap(self):
     #     """Test that pension contributions are capped by annual allowance."""
-    #     result = project_retirement(
+    #     user = UserProfile(
     #         current_age=30,
     #         retirement_age=31,
-    #         salary=500000,  # Very high salary
-    #         lisa_contrib_rate=0.0,
-    #         isa_contrib_rate=0.0,
-    #         sipp_employee_rate=0.20,  # High contribution rates
-    #         sipp_employer_rate=0.10,
-    #         workplace_employee_rate=0.20,
-    #         workplace_employer_rate=0.20,
+    #         salary=500000,
+    #         scotland=False,
+    #     )
+    #     contrib = ContributionRates(
+    #         lisa=0.0,
+    #         isa=0.0,
+    #         sipp_employee=0.20,
+    #         sipp_employer=0.10,
+    #         workplace_employee=0.20,
+    #         workplace_employer=0.20,
     #         shift_lisa_to_isa=0.0,
     #         shift_lisa_to_sipp=0.0,
-    #         roi_lisa=0.0,
-    #         roi_isa=0.0,
-    #         roi_sipp=0.0,
-    #         roi_workplace=0.0,
-    #         inflation=0.0,
-    #         scotland=False,
-    #         use_qualifying_earnings=False,  # Use full salary
     #     )
-
-    #     # Total gross pension contributions should not exceed £60,000
+    #     returns = InvestmentReturns(
+    #         lisa=0.0,
+    #         isa=0.0,
+    #         sipp=0.0,
+    #         workplace=0.0,
+    #     )
+    #     result = project_retirement(
+    #         user=user,
+    #         contrib=contrib,
+    #         returns=returns,
+    #         inflation=0.0,
+    #         use_qualifying_earnings=False,
+    #         year=2025,
+    #     )
     #     row = result.iloc[0]
     #     total_pension = (
     #         row["SIPP Employee Gross"]
@@ -164,25 +207,35 @@ class TestProjectRetirement:
 
     def test_inflation_indexing(self):
         """Test that salary is indexed by inflation."""
-        result = project_retirement(
+        user = UserProfile(
             current_age=30,
             retirement_age=32,
             salary=40000,
-            lisa_contrib_rate=0.0,
-            isa_contrib_rate=0.0,
-            sipp_employee_rate=0.0,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.0,
-            workplace_employer_rate=0.0,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
             shift_lisa_to_isa=0.0,
             shift_lisa_to_sipp=0.0,
-            roi_lisa=0.0,
-            roi_isa=0.0,
-            roi_sipp=0.0,
-            roi_workplace=0.0,
-            inflation=0.10,  # 10% inflation
-            scotland=False,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            inflation=0.10,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # Salary should increase by 10% each year
@@ -191,25 +244,35 @@ class TestProjectRetirement:
 
     def test_pot_growth(self):
         """Test that pots grow with returns."""
-        result = project_retirement(
+        user = UserProfile(
             current_age=30,
             retirement_age=32,
             salary=40000,
-            lisa_contrib_rate=0.05,
-            isa_contrib_rate=0.05,
-            sipp_employee_rate=0.05,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.05,
-            workplace_employer_rate=0.03,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
             shift_lisa_to_isa=0.0,
             shift_lisa_to_sipp=0.0,
-            roi_lisa=0.10,  # 10% returns
-            roi_isa=0.10,
-            roi_sipp=0.10,
-            roi_workplace=0.10,
+        )
+        returns = InvestmentReturns(
+            lisa=0.10,
+            isa=0.10,
+            sipp=0.10,
+            workplace=0.10,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=0.0,
-            scotland=False,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # All pots should be positive and growing
@@ -220,25 +283,35 @@ class TestProjectRetirement:
     def test_qualifying_earnings_calculation(self):
         """Test workplace pension contributions with qualifying earnings."""
         # Test with salary below qualifying band
-        result_low = project_retirement(
+        user = UserProfile(
             current_age=30,
             retirement_age=31,
             salary=20000,
-            lisa_contrib_rate=0.0,
-            isa_contrib_rate=0.0,
-            sipp_employee_rate=0.0,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.05,
-            workplace_employer_rate=0.03,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
             shift_lisa_to_isa=0.0,
             shift_lisa_to_sipp=0.0,
-            roi_lisa=0.0,
-            roi_isa=0.0,
-            roi_sipp=0.0,
-            roi_workplace=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        result_low = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=0.0,
-            scotland=False,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # Should be based on qualifying earnings (20000 - 6240 = 13760)
@@ -253,25 +326,35 @@ class TestProjectRetirement:
     @pytest.mark.parametrize("scotland", [False, True])
     def test_scottish_vs_uk_tax(self, scotland):
         """Test that Scottish and UK tax calculations produce different results."""
-        result = project_retirement(
+        user = UserProfile(
             current_age=30,
             retirement_age=31,
-            salary=60000,  # High enough to show difference
-            lisa_contrib_rate=0.0,
-            isa_contrib_rate=0.0,
-            sipp_employee_rate=0.10,  # Meaningful pension contribution
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.0,
-            workplace_employer_rate=0.0,
+            salary=60000,
+            scotland=scotland,
+        )
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.10,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
             shift_lisa_to_isa=0.0,
             shift_lisa_to_sipp=0.0,
-            roi_lisa=0.0,
-            roi_isa=0.0,
-            roi_sipp=0.0,
-            roi_workplace=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=0.0,
-            scotland=scotland,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # Should have some tax relief
