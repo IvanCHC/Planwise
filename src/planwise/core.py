@@ -74,7 +74,7 @@ def calculate_lisa_isa_contributions(
 
     # ISA contributions (net)
     isa_net = current_salary * contrib.isa + redirected_isa_net
-    remaining_isa_allowance = isa_limit - (lisa_gross if this_lisa_rate > 0 else 0)
+    remaining_isa_allowance = isa_limit - (lisa_net if this_lisa_rate > 0 else 0)
     if isa_net > remaining_isa_allowance:
         isa_net = remaining_isa_allowance
 
