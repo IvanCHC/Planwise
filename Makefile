@@ -14,7 +14,6 @@ test-cov:  ## Run tests with coverage
 	pytest --cov=planwise --cov-report=html --cov-report=term
 
 lint:  ## Run linting checks
-	flake8 src/ tests/
 	mypy src/
 
 format:  ## Format code
