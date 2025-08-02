@@ -63,16 +63,16 @@ class TestCalculateIncomeTax:
 
     def test_no_tax_below_personal_allowance(self):
         """Test no tax is payable below personal allowance."""
-        tax = calculate_income_tax(10_000, scotland=False)
+        tax = calculate_income_tax(10_000, scotland=False, year=2025)
         assert tax == 0.0
 
-        tax = calculate_income_tax(12_570, scotland=False)
+        tax = calculate_income_tax(12_570, scotland=False, year=2025)
         assert tax == 0.0
 
     def test_basic_rate_tax_uk(self):
         """Test basic rate tax calculation for UK."""
         # £20,000 income: (20,000 - 12,570) * 0.20 = £1,486
-        tax = calculate_income_tax(20_000, scotland=False)
+        tax = calculate_income_tax(20_000, scotland=False, year=2025)
         expected = (20_000 - 12_570) * 0.20
         assert tax == pytest.approx(expected, rel=0.01)
 
@@ -80,7 +80,7 @@ class TestCalculateIncomeTax:
         """Test higher rate tax calculation for UK."""
         # £60,000 income
         income = 60_000
-        tax = calculate_income_tax(income, scotland=False)
+        tax = calculate_income_tax(income, scotland=False, year=2025)
 
         # Basic rate on £12,570 to £50,270
         basic_rate_income = 50_270 - 12_570
@@ -97,7 +97,7 @@ class TestCalculateIncomeTax:
         """Test Scottish tax calculation."""
         # £30,000 income in Scotland
         income = 30_000
-        tax = calculate_income_tax(income, scotland=True)
+        tax = calculate_income_tax(income, scotland=True, year=2025)
 
         # Calculate expected tax manually
         # Starter rate: (15,397 - 12,570) * 0.19
@@ -113,7 +113,7 @@ class TestCalculateIncomeTax:
     def test_additional_rate_tax_uk(self):
         """Test additional rate tax for very high earners."""
         income = 150_000
-        tax = calculate_income_tax(income, scotland=False)
+        tax = calculate_income_tax(income, scotland=False, year=2025)
 
         # Should include all three rates
         basic_rate_tax = (50_270 - 12_570) * 0.20
@@ -140,7 +140,7 @@ class TestCalculateIncomeTax:
     )
     def test_tax_is_non_negative(self, income, scotland):
         """Test that tax calculations never return negative values."""
-        tax = calculate_income_tax(income, scotland)
+        tax = calculate_income_tax(income, scotland, year=2025)
         assert tax >= 0
 
     def test_tax_increases_with_income(self):
@@ -148,7 +148,9 @@ class TestCalculateIncomeTax:
         incomes = [10_000, 20_000, 40_000, 60_000, 100_000, 150_000]
 
         for scotland in [False, True]:
-            taxes = [calculate_income_tax(income, scotland) for income in incomes]
+            taxes = [
+                calculate_income_tax(income, scotland, year=2025) for income in incomes
+            ]
 
             # Tax should generally increase (allowing for minor calculation differences)
             for i in range(1, len(taxes)):

@@ -85,7 +85,7 @@ def get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[List[TaxBand], floa
     return region_data["bands"], region_data["personal_allowance"]
 
 
-def calculate_income_tax(income: float, scotland: bool) -> float:
+def calculate_income_tax(income: float, scotland: bool, year: int = 2025) -> float:
     """Compute income tax payable on taxable income.
 
     Parameters
@@ -94,13 +94,15 @@ def calculate_income_tax(income: float, scotland: bool) -> float:
         Taxable income (after personal allowance and before relief adjustments).
     scotland : bool
         Use Scottish tax bands if True.
+    year : int, optional
+        Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
 
     Returns
     -------
     float
         Tax payable in pounds.
     """
-    bands, personal_allowance = get_tax_bands(scotland)
+    bands, personal_allowance = get_tax_bands(scotland, year)
     # Remove personal allowance from income
     taxable = max(income - personal_allowance, 0)
     tax_due = 0.0
