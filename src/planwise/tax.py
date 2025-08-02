@@ -34,19 +34,21 @@ def get_tax_bands(scotland: bool) -> Tuple[List[TaxBand], float]:
     if scotland:
         # Scottish bands for 2025/26: thresholds include personal allowance
         bands = [
-            TaxBand(threshold=12_570, rate=0.19),
-            TaxBand(threshold=15_397, rate=0.20),
-            TaxBand(threshold=27_491, rate=0.21),
-            TaxBand(threshold=43_662, rate=0.42),
-            TaxBand(threshold=75_000, rate=0.45),
-            TaxBand(threshold=125_140, rate=0.48),
+            TaxBand(threshold=12_570, rate=0.0),
+            TaxBand(threshold=15_397, rate=0.19),
+            TaxBand(threshold=27_491, rate=0.20),
+            TaxBand(threshold=43_662, rate=0.21),
+            TaxBand(threshold=75_000, rate=0.42),
+            TaxBand(threshold=125_140, rate=0.45),
+            TaxBand(threshold=float("inf"), rate=0.48),
         ]
     else:
         # Rest of UK bands for 2025/26
         bands = [
-            TaxBand(threshold=12_570, rate=0.20),
-            TaxBand(threshold=50_270, rate=0.40),
-            TaxBand(threshold=125_140, rate=0.45),
+            TaxBand(threshold=12_570, rate=0.0),
+            TaxBand(threshold=50_270, rate=0.20),
+            TaxBand(threshold=125_140, rate=0.40),
+            TaxBand(threshold=float("inf"), rate=0.45),
         ]
     return bands, personal_allowance
 
