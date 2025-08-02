@@ -4,7 +4,7 @@ Tests for tax calculations.
 
 import pytest
 
-from planwise.tax import TaxBand, calculate_income_tax, get_tax_bands
+from planwise.tax import TaxBand, calculate_income_tax, get_tax_bands, load_tax_bands_db
 
 
 class TestTaxBand:
@@ -22,7 +22,7 @@ class TestGetTaxBands:
 
     def test_get_uk_tax_bands(self):
         """Test getting rest-of-UK tax bands."""
-        bands, personal_allowance = get_tax_bands(scotland=False)
+        bands, personal_allowance = get_tax_bands(scotland=False, year=2025)
 
         assert personal_allowance == 12_570.0
         assert len(bands) == 4
@@ -39,7 +39,7 @@ class TestGetTaxBands:
 
     def test_get_scottish_tax_bands(self):
         """Test getting Scottish tax bands."""
-        bands, personal_allowance = get_tax_bands(scotland=True)
+        bands, personal_allowance = get_tax_bands(scotland=True, year=2025)
 
         assert personal_allowance == 12_570.0
         assert len(bands) == 7
@@ -49,6 +49,13 @@ class TestGetTaxBands:
         assert bands[0].rate == 0
         assert bands[-1].threshold == float("inf")
         assert bands[-1].rate == 0.48
+
+    def test_year_not_found(self):
+        """Test ValueError is raised when year is not found."""
+        import pytest
+
+        with pytest.raises(ValueError, match="No tax band data for year 2024"):
+            get_tax_bands(scotland=False, year=2024)
 
 
 class TestCalculateIncomeTax:
@@ -146,3 +153,22 @@ class TestCalculateIncomeTax:
             # Tax should generally increase (allowing for minor calculation differences)
             for i in range(1, len(taxes)):
                 assert taxes[i] >= taxes[i - 1] - 0.01
+
+
+class TestLoadTaxBandsDB:
+    """Test loading of tax bands database."""
+
+    def test_load_tax_bands_db_structure(self):
+        db = load_tax_bands_db()
+        assert isinstance(db, dict)
+        assert 2025 in db
+        for year, regions in db.items():
+            assert isinstance(regions, dict)
+            for region, data in regions.items():
+                assert "personal_allowance" in data
+                assert "bands" in data
+                assert isinstance(data["bands"], list)
+                for band in data["bands"]:
+                    # Each band should be a TaxBand instance
+                    assert hasattr(band, "threshold")
+                    assert hasattr(band, "rate")
