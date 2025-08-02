@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-08-02
 
 ### Added
-- Initial release of the Financial Planner library
+- Initial release of the Planwise library
 - Core projection engine for UK retirement planning
 - Support for multiple tax wrappers (LISA, ISA, SIPP, workplace pension)
 - Tax relief calculations for both Scottish and rest-of-UK systems

@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 # Import from our library
-import planwise as fp
+import planwise as pw
 
 
 def main() -> None:
@@ -90,7 +90,7 @@ def main() -> None:
 
     # Run model using our library
     try:
-        df = fp.project_retirement(
+        df = pw.project_retirement(
             current_age=current_age,
             retirement_age=retirement_age,
             salary=salary,
@@ -201,12 +201,12 @@ def main() -> None:
 
             with col1:
                 st.subheader("Annual Contributions")
-                contrib_chart = fp.make_contribution_plot(df)
+                contrib_chart = pw.make_contribution_plot(df)
                 st.altair_chart(contrib_chart, use_container_width=True)
 
             with col2:
                 st.subheader("Pot Growth Over Time")
-                growth_chart = fp.make_growth_plot(df)
+                growth_chart = pw.make_growth_plot(df)
                 st.altair_chart(growth_chart, use_container_width=True)
 
         except ImportError:
