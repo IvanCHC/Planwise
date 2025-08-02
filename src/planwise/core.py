@@ -5,8 +5,10 @@ This module contains the main projection function that models retirement
 savings across various UK tax wrappers over time.
 """
 
+import json
+import os
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import pandas as pd
 
@@ -39,6 +41,87 @@ class InvestmentReturns:
     isa: float
     sipp: float
     workplace: float
+
+
+def load_limits_db() -> Any:
+    """Load annual limits and constants from JSON."""
+    json_path = os.path.join(os.path.dirname(__file__), "data", "limits.json")
+    with open(json_path, "r") as f:
+        return json.load(f)
+
+
+def calculate_lisa_isa_contributions(
+    current_salary: float,
+    age: int,
+    contrib: ContributionRates,
+    lisa_limit: float,
+    isa_limit: float,
+) -> dict:
+    """Calculate LISA and ISA contributions, including redirection after age 50."""
+    # LISA contributions
+    this_lisa_rate = contrib.lisa if age < 50 else 0.0
+    lisa_net = current_salary * this_lisa_rate
+    if lisa_net > lisa_limit:
+        lisa_net = lisa_limit
+    lisa_bonus = lisa_net * 0.25
+    lisa_gross = lisa_net + lisa_bonus
+
+    # If over age 50, redirect LISA contribution amount into ISA and SIPP
+    lisa_to_isa_rate = contrib.shift_lisa_to_isa if age >= 50 else 0.0
+    lisa_to_sipp_rate = contrib.shift_lisa_to_sipp if age >= 50 else 0.0
+    redirected_amount = current_salary * contrib.lisa if age >= 50 else 0.0
+    redirected_isa_net = redirected_amount * lisa_to_isa_rate
+
+    # ISA contributions (net)
+    isa_net = current_salary * contrib.isa + redirected_isa_net
+    remaining_isa_allowance = isa_limit - (lisa_gross if this_lisa_rate > 0 else 0)
+    if isa_net > remaining_isa_allowance:
+        isa_net = remaining_isa_allowance
+
+    # For SIPP redirection
+    redirected_sipp_net = redirected_amount * lisa_to_sipp_rate
+
+    return {
+        "lisa_net": lisa_net,
+        "lisa_bonus": lisa_bonus,
+        "lisa_gross": lisa_gross,
+        "isa_net": isa_net,
+        "redirected_sipp_net": redirected_sipp_net,
+    }
+
+
+def calculate_pension_contributions(
+    current_salary: float,
+    base_for_workplace: float,
+    contrib: ContributionRates,
+    redirected_sipp_net: float,
+) -> dict:
+    """Calculate SIPP and workplace pension contributions."""
+    # SIPP personal contributions (employee) – relief at source
+    sipp_employee_net = current_salary * contrib.sipp_employee + redirected_sipp_net
+    sipp_employee_gross = sipp_employee_net / 0.8 if sipp_employee_net > 0 else 0.0
+
+    # Employer contributions into SIPP (rare); no tax relief needed
+    sipp_employer_gross = current_salary * contrib.sipp_employer
+
+    # Workplace pension contributions – relief at source (employee)
+    wp_employee_net = base_for_workplace * contrib.workplace_employee
+    wp_employee_gross = wp_employee_net / 0.8 if wp_employee_net > 0 else 0.0
+
+    # Employer contributions to workplace pension
+    wp_employer_gross = base_for_workplace * contrib.workplace_employer
+
+    return {
+        "sipp_employee_net": sipp_employee_net,
+        "sipp_employee_gross": sipp_employee_gross,
+        "sipp_employer_gross": sipp_employer_gross,
+        "wp_employee_net": wp_employee_net,
+        "wp_employee_gross": wp_employee_gross,
+        "wp_employer_gross": wp_employer_gross,
+    }
+
+
+LIMITS_DB = load_limits_db()
 
 
 def project_retirement(
@@ -75,17 +158,15 @@ def project_retirement(
     years = user.retirement_age - user.current_age
 
     # Constants
-    qualifying_lower = 6_240.0
-    qualifying_upper = 50_270.0
-    lisa_limit = 4_000.0
-    isa_limit = 20_000.0
-    pension_annual_allowance = 60_000.0
-    personal_allowance = 12_570.0
+    limits = LIMITS_DB[str(year)]
+    qualifying_lower = limits["qualifying_lower"]
+    qualifying_upper = limits["qualifying_upper"]
+    lisa_limit = limits["lisa_limit"]
+    isa_limit = limits["isa_limit"]
+    pension_annual_allowance = limits["pension_annual_allowance"]
 
-    # Preallocate lists for results
     records: List[Dict] = []
 
-    # Starting pots
     pot_lisa = 0.0
     pot_isa = 0.0
     pot_sipp = 0.0
@@ -94,13 +175,6 @@ def project_retirement(
 
     for year_index in range(years):
         age = user.current_age + year_index
-
-        # Determine LISA contribution rate: active until age < 50
-        this_lisa_rate = contrib.lisa if age < 50 else 0.0
-
-        # Determine shift amounts after 50
-        lisa_to_isa_rate = contrib.shift_lisa_to_isa if age >= 50 else 0.0
-        lisa_to_sipp_rate = contrib.shift_lisa_to_sipp if age >= 50 else 0.0
 
         # Determine the contribution bases
         if use_qualifying_earnings:
@@ -112,39 +186,31 @@ def project_retirement(
         else:
             base_for_workplace = current_salary
 
-        # LISA contributions
-        lisa_net = current_salary * this_lisa_rate
-        # Cap by LISA annual allowance
-        if lisa_net > lisa_limit:
-            lisa_net = lisa_limit
-        lisa_bonus = lisa_net * 0.25  # 25 % government bonus
-        lisa_gross = lisa_net + lisa_bonus
+        lisa_isa = calculate_lisa_isa_contributions(
+            current_salary=current_salary,
+            age=age,
+            contrib=contrib,
+            lisa_limit=lisa_limit,
+            isa_limit=isa_limit,
+        )
+        lisa_net = lisa_isa["lisa_net"]
+        lisa_bonus = lisa_isa["lisa_bonus"]
+        lisa_gross = lisa_isa["lisa_gross"]
+        isa_net = lisa_isa["isa_net"]
+        redirected_sipp_net = lisa_isa["redirected_sipp_net"]
 
-        # If over age 50, redirect LISA contribution amount into ISA and SIPP
-        redirected_amount = current_salary * contrib.lisa if age >= 50 else 0.0
-        redirected_isa_net = redirected_amount * lisa_to_isa_rate
-        redirected_sipp_net = redirected_amount * lisa_to_sipp_rate
-
-        # ISA contributions (net)
-        isa_net = current_salary * contrib.isa + redirected_isa_net
-        # Cap ISA contributions by remaining allowance after LISA (gross). The LISA gross counts towards the £20k allowance.
-        remaining_isa_allowance = isa_limit - (lisa_gross if this_lisa_rate > 0 else 0)
-        if isa_net > remaining_isa_allowance:
-            isa_net = remaining_isa_allowance
-
-        # SIPP personal contributions (employee) – relief at source
-        sipp_employee_net = current_salary * contrib.sipp_employee + redirected_sipp_net
-        sipp_employee_gross = sipp_employee_net / 0.8 if sipp_employee_net > 0 else 0.0
-
-        # Employer contributions into SIPP (rare); no tax relief needed
-        sipp_employer_gross = current_salary * contrib.sipp_employer
-
-        # Workplace pension contributions – relief at source (employee)
-        wp_employee_net = base_for_workplace * contrib.workplace_employee
-        wp_employee_gross = wp_employee_net / 0.8 if wp_employee_net > 0 else 0.0
-
-        # Employer contributions to workplace pension
-        wp_employer_gross = base_for_workplace * contrib.workplace_employer
+        pensions = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+        sipp_employee_net = pensions["sipp_employee_net"]
+        sipp_employee_gross = pensions["sipp_employee_gross"]
+        sipp_employer_gross = pensions["sipp_employer_gross"]
+        wp_employee_net = pensions["wp_employee_net"]
+        wp_employee_gross = pensions["wp_employee_gross"]
+        wp_employer_gross = pensions["wp_employer_gross"]
 
         # Total gross pension contributions (employee and employer)
         total_pension_gross = (
@@ -156,7 +222,6 @@ def project_retirement(
 
         # Ensure we do not exceed annual allowance; cap employee contributions to respect the allowance
         if total_pension_gross > pension_annual_allowance:
-            # Adjust the largest employee contribution (SIPP) first
             excess = total_pension_gross - pension_annual_allowance
             if sipp_employee_gross >= excess:
                 sipp_employee_gross -= excess
@@ -166,7 +231,6 @@ def project_retirement(
                 excess -= sipp_employee_gross
                 sipp_employee_gross = 0
                 sipp_employee_net = 0
-                # Next adjust workplace employee
                 if wp_employee_gross >= excess:
                     wp_employee_gross -= excess
                     wp_employee_net = wp_employee_gross * 0.8

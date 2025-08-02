@@ -134,28 +134,43 @@ class TestPlottingIntegration:
         except ImportError:
             pytest.skip("Altair not available")
 
-        from planwise.core import project_retirement
+        from planwise.core import (
+            ContributionRates,
+            InvestmentReturns,
+            UserProfile,
+            project_retirement,
+        )
 
-        # Run a small projection
-        result = project_retirement(
+        # Run a small projection using the new dataclass-based interface
+        user = UserProfile(
             current_age=30,
             retirement_age=33,
             salary=40000,
-            lisa_contrib_rate=0.05,
-            isa_contrib_rate=0.05,
-            sipp_employee_rate=0.05,
-            sipp_employer_rate=0.0,
-            workplace_employee_rate=0.05,
-            workplace_employer_rate=0.03,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
             shift_lisa_to_isa=0.5,
             shift_lisa_to_sipp=0.5,
-            roi_lisa=0.05,
-            roi_isa=0.05,
-            roi_sipp=0.05,
-            roi_workplace=0.05,
+        )
+        returns = InvestmentReturns(
+            lisa=0.05,
+            isa=0.05,
+            sipp=0.05,
+            workplace=0.05,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=0.02,
-            scotland=False,
             use_qualifying_earnings=True,
+            year=2025,
         )
 
         # Test all plotting functions work

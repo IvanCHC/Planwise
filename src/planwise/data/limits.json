@@ -1,0 +1,9 @@
+{
+  "2025": {
+    "lisa_limit": 4000.0,
+    "isa_limit": 20000.0,
+    "pension_annual_allowance": 60000.0,
+    "qualifying_lower": 6240.0,
+    "qualifying_upper": 50270.0
+  }
+}

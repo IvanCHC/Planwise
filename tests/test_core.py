@@ -10,6 +10,8 @@ from planwise.core import (
     ContributionRates,
     InvestmentReturns,
     UserProfile,
+    calculate_lisa_isa_contributions,
+    calculate_pension_contributions,
     project_retirement,
 )
 
@@ -323,3 +325,213 @@ class TestProjectRetirement:
         # Should have some tax relief
         tax_relief = result.iloc[0]["Tax Relief (total)"]
         assert tax_relief > 0
+
+    def test_lisa_isa_under_50(self):
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.05,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=30000,
+            age=30,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # LISA: 10% of 30,000 = 3,000 (under limit)
+        assert result["lisa_net"] == 3000
+        assert result["lisa_bonus"] == 750
+        assert result["lisa_gross"] == 3750
+        # ISA: 5% of 30,000 = 1,500
+        assert result["isa_net"] == 1500
+        # No redirection
+        assert result["redirected_sipp_net"] == 0
+
+    def test_lisa_isa_lisa_cap(self):
+        contrib = ContributionRates(
+            lisa=0.20,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=30000,
+            age=30,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # LISA: 20% of 30,000 = 6,000, but capped at 4,000
+        assert result["lisa_net"] == 4000
+        assert result["lisa_bonus"] == 1000
+        assert result["lisa_gross"] == 5000
+
+    def test_lisa_isa_over_50_redirection(self):
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.05,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.6,
+            shift_lisa_to_sipp=0.4,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=30000,
+            age=55,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # Over 50: no LISA, but 10% of 30,000 = 3,000 redirected
+        # 60% to ISA, 40% to SIPP
+        assert result["lisa_net"] == 0
+        assert result["lisa_bonus"] == 0
+        assert result["lisa_gross"] == 0
+        assert result["isa_net"] == 0.05 * 30000 + 0.6 * 3000  # 1500 + 1800 = 3300
+        assert result["redirected_sipp_net"] == 0.4 * 3000  # 1200
+
+    def test_isa_cap_with_lisa(self):
+        contrib = ContributionRates(
+            lisa=0.20,
+            isa=0.20,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=100_000,
+            age=30,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # LISA: capped at 4000, gross 5000
+        # ISA: 20% of 100,000 = 20,000, but only 20,000 - 5,000 = 15,000 allowed
+        assert result["lisa_net"] == 4000
+        assert result["lisa_gross"] == 5000
+
+    def test_pension_contributions_basic(self):
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.05,
+            sipp_employer=0.03,
+            workplace_employee=0.04,
+            workplace_employer=0.02,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        current_salary = 50000
+        base_for_workplace = 40000
+        redirected_sipp_net = 0
+
+        result = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+
+        # SIPP employee: 5% of 50,000 = 2,500 net, grossed up to 3,125
+        assert abs(result["sipp_employee_net"] - 2500) < 0.01
+        assert abs(result["sipp_employee_gross"] - 3125) < 0.01
+        # SIPP employer: 3% of 50,000 = 1,500
+        assert abs(result["sipp_employer_gross"] - 1500) < 0.01
+        # WP employee: 4% of 40,000 = 1,600 net, grossed up to 2,000
+        assert abs(result["wp_employee_net"] - 1600) < 0.01
+        assert abs(result["wp_employee_gross"] - 2000) < 0.01
+        # WP employer: 2% of 40,000 = 800
+        assert abs(result["wp_employer_gross"] - 800) < 0.01
+
+    def test_pension_contributions_with_redirection(self):
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        current_salary = 30000
+        base_for_workplace = 30000
+        redirected_sipp_net = 1000
+
+        result = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+
+        # SIPP employee: (5% of 30,000) + 1,000 = 2,500 net, grossed up to 3,125
+        assert abs(result["sipp_employee_net"] - 2500) < 0.01
+        assert abs(result["sipp_employee_gross"] - 3125) < 0.01
+        # SIPP employer: 0
+        assert result["sipp_employer_gross"] == 0
+        # WP employee/employer: 0
+        assert result["wp_employee_net"] == 0
+        assert result["wp_employee_gross"] == 0
+        assert result["wp_employer_gross"] == 0
+
+    def test_pension_contributions_zero(self):
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        current_salary = 0
+        base_for_workplace = 0
+        redirected_sipp_net = 0
+
+        result = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+
+        assert result["sipp_employee_net"] == 0
+        assert result["sipp_employee_gross"] == 0
+        assert result["sipp_employer_gross"] == 0
+        assert result["wp_employee_net"] == 0
+        assert result["wp_employee_gross"] == 0
+        assert result["wp_employer_gross"] == 0
+
+    def test_load_limits_db(self):
+        """Test that load_limits_db loads the limits JSON and contains expected keys."""
+        from planwise.core import load_limits_db
+
+        limits = load_limits_db()
+        assert isinstance(limits, dict)
+        assert "2025" in limits
+        year_limits = limits["2025"]
+        for key in [
+            "lisa_limit",
+            "isa_limit",
+            "pension_annual_allowance",
+            "qualifying_lower",
+            "qualifying_upper",
+        ]:
+            assert key in year_limits
