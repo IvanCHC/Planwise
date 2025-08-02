@@ -98,26 +98,36 @@ def main() -> None:
         help="If checked, workplace pension contributions are calculated on qualifying earnings (£6,240–£50,270). Otherwise contributions are based on total salary.",
     )
 
+    user = pw.core.UserProfile(
+        current_age=current_age,
+        retirement_age=retirement_age,
+        salary=salary,
+        scotland=scotland,
+    )
+    contrib = pw.core.ContributionRates(
+        lisa=lisa_rate,
+        isa=isa_rate,
+        sipp_employee=sipp_employee_rate,
+        sipp_employer=sipp_employer_rate,
+        workplace_employee=workplace_employee_rate,
+        workplace_employer=workplace_employer_rate,
+        shift_lisa_to_isa=shift_lisa_to_isa,
+        shift_lisa_to_sipp=shift_lisa_to_sipp,
+    )
+    returns = pw.core.InvestmentReturns(
+        lisa=roi_lisa,
+        isa=roi_isa,
+        sipp=roi_sipp,
+        workplace=roi_workplace,
+    )
+
     # Run model using our library
     try:
         df = pw.project_retirement(
-            current_age=current_age,
-            retirement_age=retirement_age,
-            salary=salary,
-            lisa_contrib_rate=lisa_rate,
-            isa_contrib_rate=isa_rate,
-            sipp_employee_rate=sipp_employee_rate,
-            sipp_employer_rate=sipp_employer_rate,
-            workplace_employee_rate=workplace_employee_rate,
-            workplace_employer_rate=workplace_employer_rate,
-            shift_lisa_to_isa=shift_lisa_to_isa,
-            shift_lisa_to_sipp=shift_lisa_to_sipp,
-            roi_lisa=roi_lisa,
-            roi_isa=roi_isa,
-            roi_sipp=roi_sipp,
-            roi_workplace=roi_workplace,
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=inflation,
-            scotland=scotland,
             use_qualifying_earnings=use_qualifying,
             year=tax_year,
         )
