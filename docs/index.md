@@ -7,26 +7,38 @@ Welcome to the Planwise documentation! This library helps you model retirement s
 ```python
 import planwise as pw
 
-# Basic projection
-results = pw.project_retirement(
+from planwise.core import UserProfile, ContributionRates, InvestmentReturns
+
+user = UserProfile(
     current_age=30,
     retirement_age=67,
     salary=40000,
-    lisa_contrib_rate=0.05,
-    isa_contrib_rate=0.05,
-    sipp_employee_rate=0.05,
-    sipp_employer_rate=0.0,
-    workplace_employee_rate=0.05,
-    workplace_employer_rate=0.03,
+    scotland=False,
+)
+contrib = ContributionRates(
+    lisa=0.05,
+    isa=0.05,
+    sipp_employee=0.05,
+    sipp_employer=0.0,
+    workplace_employee=0.05,
+    workplace_employer=0.03,
     shift_lisa_to_isa=0.5,
     shift_lisa_to_sipp=0.5,
-    roi_lisa=0.05,
-    roi_isa=0.05,
-    roi_sipp=0.05,
-    roi_workplace=0.05,
+)
+returns = InvestmentReturns(
+    lisa=0.05,
+    isa=0.05,
+    sipp=0.05,
+    workplace=0.05,
+)
+
+results = pw.project_retirement(
+    user=user,
+    contrib=contrib,
+    returns=returns,
     inflation=0.02,
-    scotland=False,
     use_qualifying_earnings=True,
+    year=2025,
 )
 
 print(results.head())
@@ -36,32 +48,48 @@ print(results.head())
 
 ### Core Functions
 
-#### `project_retirement()`
+#### `project_retirement(user, contrib, returns, inflation, use_qualifying_earnings, year)`
 
 Main function for projecting retirement savings across multiple tax wrappers.
 
 **Parameters:**
-- `current_age` (int): Current age
-- `retirement_age` (int): Target retirement age
-- `salary` (float): Annual salary in pounds
-- `lisa_contrib_rate` (float): LISA contribution rate (0-1)
-- `isa_contrib_rate` (float): ISA contribution rate (0-1)
-- `sipp_employee_rate` (float): SIPP employee contribution rate (0-1)
-- `sipp_employer_rate` (float): SIPP employer contribution rate (0-1)
-- `workplace_employee_rate` (float): Workplace pension employee rate (0-1)
-- `workplace_employer_rate` (float): Workplace pension employer rate (0-1)
-- `shift_lisa_to_isa` (float): Fraction of LISA redirected to ISA after age 50 (0-1)
-- `shift_lisa_to_sipp` (float): Fraction of LISA redirected to SIPP after age 50 (0-1)
-- `roi_lisa` (float): Expected LISA annual return (0-1)
-- `roi_isa` (float): Expected ISA annual return (0-1)
-- `roi_sipp` (float): Expected SIPP annual return (0-1)
-- `roi_workplace` (float): Expected workplace pension annual return (0-1)
+- `user` (`UserProfile`): User profile including age, retirement age, salary, and region.
+- `contrib` (`ContributionRates`): Contribution rates for each wrapper and shift rates after age 50.
+- `returns` (`InvestmentReturns`): Expected annual rates of return for each wrapper.
 - `inflation` (float): Annual inflation rate (0-1)
-- `scotland` (bool): Use Scottish tax bands if True
 - `use_qualifying_earnings` (bool): Use qualifying earnings for workplace pension
+- `year` (int): Tax year (e.g., 2025 for 2025/26)
 
 **Returns:**
 - `pd.DataFrame`: Year-by-year projection results
+
+#### `UserProfile`
+
+Dataclass for user profile:
+- `current_age` (int)
+- `retirement_age` (int)
+- `salary` (float)
+- `scotland` (bool)
+
+#### `ContributionRates`
+
+Dataclass for contribution rates:
+- `lisa` (float)
+- `isa` (float)
+- `sipp_employee` (float)
+- `sipp_employer` (float)
+- `workplace_employee` (float)
+- `workplace_employer` (float)
+- `shift_lisa_to_isa` (float)
+- `shift_lisa_to_sipp` (float)
+
+#### `InvestmentReturns`
+
+Dataclass for investment returns:
+- `lisa` (float)
+- `isa` (float)
+- `sipp` (float)
+- `workplace` (float)
 
 ### Tax Functions
 
