@@ -89,7 +89,7 @@ include = '\.pyi?$'
 [tool.isort]
 profile = "black"
 line_length = 88
-known_first_party = ["financial_planner"]
+known_first_party = ["planwise"]
 
 # pytest configuration
 [tool.pytest.ini_options]

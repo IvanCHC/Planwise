@@ -11,7 +11,7 @@ test:  ## Run the test suite
 	pytest
 
 test-cov:  ## Run tests with coverage
-	pytest --cov=financial_planner --cov-report=html --cov-report=term
+	pytest --cov=planwise --cov-report=html --cov-report=term
 
 lint:  ## Run linting checks
 	flake8 src/ tests/
