@@ -229,8 +229,5 @@ def project_retirement(
             }
         )
 
-        # Inflate salary for next year
-        current_salary *= 1 + inflation
-
     df = pd.DataFrame(records)
     return df

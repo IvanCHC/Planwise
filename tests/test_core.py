@@ -205,43 +205,6 @@ class TestProjectRetirement:
     #     )
     #     assert total_pension <= 60000.1  # Allow for small rounding
 
-    def test_inflation_indexing(self):
-        """Test that salary is indexed by inflation."""
-        user = UserProfile(
-            current_age=30,
-            retirement_age=32,
-            salary=40000,
-            scotland=False,
-        )
-        contrib = ContributionRates(
-            lisa=0.0,
-            isa=0.0,
-            sipp_employee=0.0,
-            sipp_employer=0.0,
-            workplace_employee=0.0,
-            workplace_employer=0.0,
-            shift_lisa_to_isa=0.0,
-            shift_lisa_to_sipp=0.0,
-        )
-        returns = InvestmentReturns(
-            lisa=0.0,
-            isa=0.0,
-            sipp=0.0,
-            workplace=0.0,
-        )
-        result = project_retirement(
-            user=user,
-            contrib=contrib,
-            returns=returns,
-            inflation=0.10,
-            use_qualifying_earnings=True,
-            year=2025,
-        )
-
-        # Salary should increase by 10% each year
-        assert abs(result.iloc[0]["Salary"] - 40000) < 0.01
-        assert abs(result.iloc[1]["Salary"] - 44000) < 0.01  # 40000 * 1.1
-
     def test_pot_growth(self):
         """Test that pots grow with returns."""
         user = UserProfile(
