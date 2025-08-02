@@ -211,7 +211,7 @@ def main() -> None:
 
         except ImportError:
             st.warning(
-                "Visualization features require the 'altair' package. Install with: pip install 'financial-planner[plotting]'"
+                "Visualization features require the 'altair' package. Install with: pip install 'planwise[plotting]'"
             )
         except Exception as e:
             st.error(f"Error creating visualizations: {e}")
