@@ -17,6 +17,16 @@ def main() -> None:
     st.set_page_config(page_title="UK Retirement & Investment Planner", layout="wide")
     st.title("UK Investment & Retirement Planning Model")
 
+    tax_band_db = pw.tax.load_tax_bands_db()
+    available_years = sorted(tax_band_db.keys())
+    default_year = max(available_years)
+    tax_year = st.sidebar.selectbox(
+        "Tax year for calculations",
+        options=available_years,
+        index=available_years.index(default_year),
+        format_func=lambda y: f"{y}/{str(y+1)[-2:]}",
+    )
+
     st.markdown(
         """
         Use this tool to project how your investments in a Lifetime ISA (LISA), Stocks & Shares ISA,
@@ -109,6 +119,7 @@ def main() -> None:
             inflation=inflation,
             scotland=scotland,
             use_qualifying_earnings=use_qualifying,
+            year=tax_year,
         )
 
         # Summary metrics

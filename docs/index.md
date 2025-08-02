@@ -65,13 +65,28 @@ Main function for projecting retirement savings across multiple tax wrappers.
 
 ### Tax Functions
 
-#### `calculate_income_tax(income, scotland)`
+#### `calculate_income_tax(income, scotland, year)`
 
-Calculate income tax for given income and region.
+Calculate income tax for a given income, region, and tax year.
 
-#### `get_tax_bands(scotland)`
+**Parameters:**
+- `income` (float): Taxable income (after personal allowance and before relief adjustments)
+- `scotland` (bool): Use Scottish tax bands if True
+- `year` (int): Tax year (e.g., 2025 for 2025/26)
 
-Get tax bands and personal allowance for region.
+**Returns:**
+- `float`: Tax payable in pounds
+
+#### `get_tax_bands(scotland, year)`
+
+Get tax bands and personal allowance for a region and tax year.
+
+**Parameters:**
+- `scotland` (bool): Use Scottish tax bands if True
+- `year` (int): Tax year (e.g., 2025 for 2025/26)
+
+**Returns:**
+- `Tuple[List[TaxBand], float]`: List of TaxBand objects and personal allowance for the given year
 
 ### Plotting Functions
 

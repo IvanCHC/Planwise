@@ -31,6 +31,7 @@ def project_retirement(
     inflation: float,
     scotland: bool,
     use_qualifying_earnings: bool,
+    year: int,
 ) -> pd.DataFrame:
     """Compute the year‑by‑year contributions, tax relief and account balances.
 
@@ -75,6 +76,8 @@ def project_retirement(
     use_qualifying_earnings : bool
         If True, workplace pension contributions are calculated on qualifying earnings
         (£6,240–£50,270). Otherwise contributions are based on total salary.
+    year : int
+        Tax year to use for income tax calculations (e.g., 2025 for 2025/26).
 
     Returns
     -------
@@ -189,12 +192,12 @@ def project_retirement(
 
         # Tax calculations
         # Taxable income before relief = salary (contributions paid from net pay do not reduce taxable income)
-        tax_before = calculate_income_tax(current_salary, scotland)
+        tax_before = calculate_income_tax(current_salary, scotland, year=year)
         # Taxable income after relief = salary - total gross personal contributions (employee only). Employer contributions do not reduce taxable income.
         # For relief at source, contributions are grossed up (we subtract the gross personal contributions). This reduces the amount of income taxed at higher rates.
         total_personal_gross = sipp_employee_gross + wp_employee_gross
         tax_after = calculate_income_tax(
-            max(current_salary - total_personal_gross, 0), scotland
+            max(current_salary - total_personal_gross, 0), scotland, year=year
         )
         tax_relief_total = tax_before - tax_after
 
