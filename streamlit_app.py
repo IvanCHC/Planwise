@@ -62,6 +62,21 @@ def sidebar_inputs() -> (
             key="salary",
         )
 
+    with st.sidebar.expander("Tax Settings", expanded=False):
+        scotland = st.checkbox("Scottish taxpayer?", value=False, key="scotland")
+        use_qualifying = st.checkbox(
+            "Calculate workplace contributions using qualifying earnings band?",
+            value=False,
+            help="If checked, workplace pension contributions are calculated on qualifying earnings (£6,240–£50,270). Otherwise contributions are based on total salary.",
+            key="use_qualifying",
+        )
+        qualifying_earnings = (
+            pw.core.LIMITS_DB[str(tax_year)]["qualifying_upper"]
+            - pw.core.LIMITS_DB[str(tax_year)]["qualifying_lower"]
+        )
+        qualifying_upper = pw.core.LIMITS_DB[str(tax_year)]["qualifying_upper"]
+        qualifying_lower = pw.core.LIMITS_DB[str(tax_year)]["qualifying_lower"]
+
     with st.sidebar.expander("Contribution rates (as % of salary)", expanded=True):
         # LISA contribution rate
         lisa_limit = pw.core.LIMITS_DB[str(tax_year)]["lisa_limit"]
@@ -111,7 +126,19 @@ def sidebar_inputs() -> (
             key="workplace_employer_rate",
             help=f"Max allowed by pension annual allowance (£{pension_annual_allowance:,.0f})",
         )
-        unused_allowance = pension_annual_allowance - workplace_employer_rate * salary
+        if use_qualifying:
+            salary_factor = (
+                salary - qualifying_lower
+                if salary < qualifying_upper
+                else qualifying_earnings
+            )
+            unused_allowance = (
+                pension_annual_allowance - workplace_employer_rate * salary_factor
+            )
+        else:
+            unused_allowance = (
+                pension_annual_allowance - workplace_employer_rate * salary
+            )
 
         warning_flag = False
 
@@ -142,12 +169,20 @@ def sidebar_inputs() -> (
                 warning_flag = True
             workplace_employee_rate = 0.0
         else:
-            max_workplace_employee_rate = min(
-                unused_allowance
-                / salary
-                / 1.25,  # Tax relief on workplace contributions
-                unused_salary / salary,
-            )
+            if use_qualifying:
+                max_workplace_employee_rate = min(
+                    unused_allowance
+                    / qualifying_earnings
+                    / 1.25,  # Tax relief on workplace contributions
+                    unused_salary / salary,
+                )
+            else:
+                max_workplace_employee_rate = min(
+                    unused_allowance
+                    / salary
+                    / 1.25,  # Tax relief on workplace contributions
+                    unused_salary / salary,
+                )
             workplace_employee_rate = st.slider(
                 "Workplace pension (employee) %",
                 0.0,
@@ -157,10 +192,19 @@ def sidebar_inputs() -> (
                 key="workplace_employee_rate",
                 help=f"Max allowed by pension annual allowance (£{pension_annual_allowance:,.0f})",
             )
-            unused_salary -= workplace_employee_rate * salary
-            unused_allowance -= (
-                workplace_employee_rate * salary * 1.25
-            )  # Tax relief on workplace contributions
+            if use_qualifying:
+                salary_factor = (
+                    salary - qualifying_lower
+                    if salary < qualifying_upper
+                    else qualifying_earnings
+                )
+                unused_salary -= workplace_employee_rate * salary_factor
+                unused_allowance -= (
+                    workplace_employee_rate * salary_factor * 1.25
+                )  # Tax relief on workplace contributions
+            else:
+                unused_salary -= workplace_employee_rate * salary
+                unused_allowance -= workplace_employee_rate * salary * 1.25
 
         if unused_allowance <= 0:
             if not warning_flag:
@@ -189,10 +233,20 @@ def sidebar_inputs() -> (
                 key="sipp_employee_rate",
                 help=f"Max allowed by pension annual allowance (£{pension_annual_allowance:,.0f})",
             )
+            unused_salary -= sipp_employee_rate * salary
+            unused_allowance -= (
+                sipp_employee_rate * salary * 1.25
+            )  # Tax relief on SIPP contributions
 
         # Calculate total contribution rate from salary
+        if use_qualifying:
+            real_workplace_employee_rate = (
+                workplace_employee_rate * qualifying_earnings / salary
+            )
+        else:
+            real_workplace_employee_rate = workplace_employee_rate
         total_contrib_rate = (
-            lisa_rate + isa_rate + sipp_employee_rate + workplace_employee_rate
+            lisa_rate + isa_rate + sipp_employee_rate + real_workplace_employee_rate
         )
         st.progress(
             min(total_contrib_rate, 1.0),
@@ -200,17 +254,28 @@ def sidebar_inputs() -> (
         )
 
     with st.sidebar.expander("Post-50 LISA redirection", expanded=False):
+        total_lisa = lisa_rate * salary
+        if unused_allowance < total_lisa:
+            minimum_directable_lisa = (total_lisa - unused_allowance) / total_lisa
+        else:
+            minimum_directable_lisa = 0.0
         st.markdown(
             "*When you reach 50, you can no longer contribute to a LISA. Specify how to redirect those contributions:*"
         )
-        shift_lisa_to_isa = st.slider(
-            "% of LISA contribution redirected to ISA",
-            0.0,
-            1.0,
-            0.5,
-            step=0.05,
-            key="shift_lisa_to_isa",
-        )
+        if minimum_directable_lisa == 1.0:
+            st.warning(
+                "⚠️ You must redirect 100% of LISA contributions to ISA, maximum pension contribution is capped by the annual allowance."
+            )
+            shift_lisa_to_isa = 1.0
+        else:
+            shift_lisa_to_isa = st.slider(
+                "% of LISA contribution redirected to ISA",
+                minimum_directable_lisa,
+                1.0,
+                1.0,
+                step=0.05,
+                key="shift_lisa_to_isa",
+            )
         shift_lisa_to_sipp = 1.0 - shift_lisa_to_isa
         st.write(f"% redirected to SIPP: {shift_lisa_to_sipp:.0%}")
 
@@ -223,15 +288,6 @@ def sidebar_inputs() -> (
         )
         inflation = st.slider(
             "Inflation", 0.00, 0.10, 0.02, step=0.005, key="inflation"
-        )
-
-    with st.sidebar.expander("Tax Settings", expanded=False):
-        scotland = st.checkbox("Scottish taxpayer?", value=False, key="scotland")
-        use_qualifying = st.checkbox(
-            "Calculate workplace contributions using qualifying earnings band?",
-            value=True,
-            help="If checked, workplace pension contributions are calculated on qualifying earnings (£6,240–£50,270). Otherwise contributions are based on total salary.",
-            key="use_qualifying",
         )
 
     user = pw.core.UserProfile(
@@ -392,15 +448,12 @@ def show_sidebar_footer() -> None:
     st.sidebar.markdown("### ℹ️ About")
     st.sidebar.markdown(
         """
-        This tool models UK retirement savings for the 2025/26 tax year.
+        This tool models UK retirement savings.
 
         **Key assumptions:**
-        - Tax rules remain constant
         - No carry-forward of unused allowances
         - Relief-at-source for pension contributions
         - Government LISA bonus of 25% (max £1,000/year)
-
-        **Not financial advice.** Consult a professional for personalized guidance.
         """
     )
 
