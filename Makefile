@@ -17,8 +17,8 @@ lint:  ## Run linting checks
 	mypy src/
 
 format:  ## Format code
-	black src/ tests/
-	isort src/ tests/
+	black src/ tests/ streamlit_app.py
+	isort src/ tests/ streamlit_app.py
 
 format-check:  ## Check if code is formatted correctly
 	black --check src/ tests/
