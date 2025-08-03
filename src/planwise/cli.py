@@ -8,13 +8,17 @@ reports from the command line.
 import argparse
 import json
 import sys
-from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 
-from .core import project_retirement
-from .plotting import make_contribution_plot, make_growth_plot
+from .core import (
+    LIMITS_DB,
+    ContributionRates,
+    InvestmentReturns,
+    UserProfile,
+    project_retirement,
+)
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -142,8 +146,16 @@ Examples:
     parser.add_argument(
         "--use-qualifying-earnings",
         action="store_true",
-        default=True,
-        help="Use qualifying earnings for workplace pension (default: True)",
+        default=False,
+        help="Use qualifying earnings for workplace pension (default: False)",
+    )
+
+    # Tax year
+    parser.add_argument(
+        "--tax-year",
+        type=int,
+        default=max([int(y) for y in LIMITS_DB.keys()]),
+        help="Tax year for calculations (default: latest available)",
     )
 
     # Configuration and output
@@ -206,32 +218,43 @@ def main() -> None:
     # Load config file if specified
     if args.config:
         config = load_config(args.config)
-        # Update args with config values
         for key, value in config.items():
             if hasattr(args, key.replace("-", "_")):
                 setattr(args, key.replace("-", "_"), value)
 
+    # Prepare dataclasses for new interface
+    user = UserProfile(
+        current_age=args.current_age,
+        retirement_age=args.retirement_age,
+        salary=args.salary,
+        scotland=args.scotland,
+    )
+    contrib = ContributionRates(
+        lisa=args.lisa_rate,
+        isa=args.isa_rate,
+        sipp_employee=args.sipp_employee_rate,
+        sipp_employer=args.sipp_employer_rate,
+        workplace_employee=args.workplace_employee_rate,
+        workplace_employer=args.workplace_employer_rate,
+        shift_lisa_to_isa=args.shift_lisa_to_isa,
+        shift_lisa_to_sipp=args.shift_lisa_to_sipp,
+    )
+    returns = InvestmentReturns(
+        lisa=args.roi_lisa,
+        isa=args.roi_isa,
+        sipp=args.roi_sipp,
+        workplace=args.roi_workplace,
+    )
+
     # Run projection
     try:
         df = project_retirement(
-            current_age=args.current_age,
-            retirement_age=args.retirement_age,
-            salary=args.salary,
-            lisa_contrib_rate=args.lisa_rate,
-            isa_contrib_rate=args.isa_rate,
-            sipp_employee_rate=args.sipp_employee_rate,
-            sipp_employer_rate=args.sipp_employer_rate,
-            workplace_employee_rate=args.workplace_employee_rate,
-            workplace_employer_rate=args.workplace_employer_rate,
-            shift_lisa_to_isa=args.shift_lisa_to_isa,
-            shift_lisa_to_sipp=args.shift_lisa_to_sipp,
-            roi_lisa=args.roi_lisa,
-            roi_isa=args.roi_isa,
-            roi_sipp=args.roi_sipp,
-            roi_workplace=args.roi_workplace,
+            user=user,
+            contrib=contrib,
+            returns=returns,
             inflation=args.inflation,
-            scotland=args.scotland,
             use_qualifying_earnings=args.use_qualifying_earnings,
+            year=args.tax_year,
         )
     except Exception as e:
         print(f"Error running projection: {e}")
