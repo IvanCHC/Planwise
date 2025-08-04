@@ -1,0 +1,11 @@
+{
+  "2025": {
+    "category_a": {
+      "bands": [
+        {"threshold": 12570, "rate": 0.0},
+        {"threshold": 50270, "rate": 0.08},
+        {"threshold": "inf", "rate": 0.02}
+      ]
+    }
+  }
+}
