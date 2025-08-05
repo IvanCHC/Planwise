@@ -1,8 +1,10 @@
 """
-Core retirement projection calculations.
+Core retirement projection calculations for Planwise.
 
 This module contains the main projection function that models retirement
-savings across various UK tax wrappers over time.
+savings across various UK tax wrappers over time. It provides dataclasses for user
+profile, contribution rates, and investment returns, as well as helper functions for
+calculating contributions and projecting account balances.
 """
 
 import json
@@ -17,6 +19,15 @@ from .tax import calculate_income_tax
 
 @dataclass
 class UserProfile:
+    """
+    User profile for retirement projection.
+    Attributes:
+        current_age (int): Current age of the user.
+        retirement_age (int): Target retirement age.
+        salary (float): Current annual salary.
+        scotland (bool): Use Scottish tax bands if True.
+    """
+
     current_age: int
     retirement_age: int
     salary: float
@@ -25,6 +36,19 @@ class UserProfile:
 
 @dataclass
 class ContributionRates:
+    """
+    Contribution rates for each account type and post-50 redirection.
+    Attributes:
+        lisa (float): LISA contribution rate.
+        isa (float): ISA contribution rate.
+        sipp_employee (float): SIPP employee contribution rate.
+        sipp_employer (float): SIPP employer contribution rate.
+        workplace_employee (float): Workplace pension employee rate.
+        workplace_employer (float): Workplace pension employer rate.
+        shift_lisa_to_isa (float): Fraction of LISA redirected to ISA after 50.
+        shift_lisa_to_sipp (float): Fraction of LISA redirected to SIPP after 50.
+    """
+
     lisa: float
     isa: float
     sipp_employee: float
@@ -37,6 +61,15 @@ class ContributionRates:
 
 @dataclass
 class InvestmentReturns:
+    """
+    Expected annual rates of return for each account type.
+    Attributes:
+        lisa (float): LISA annual return.
+        isa (float): ISA annual return.
+        sipp (float): SIPP annual return.
+        workplace (float): Workplace pension annual return.
+    """
+
     lisa: float
     isa: float
     sipp: float
@@ -44,7 +77,11 @@ class InvestmentReturns:
 
 
 def load_limits_db() -> Any:
-    """Load annual limits and constants from JSON."""
+    """
+    Load annual limits and constants from JSON file.
+    Returns:
+        dict: Limits for each tax year.
+    """
     json_path = os.path.join(os.path.dirname(__file__), "data", "limits.json")
     with open(json_path, "r") as f:
         return json.load(f)
@@ -57,8 +94,18 @@ def calculate_lisa_isa_contributions(
     lisa_limit: float,
     isa_limit: float,
 ) -> dict:
-    """Calculate LISA and ISA contributions, including redirection after age 50."""
-    # LISA contributions
+    """
+    Calculate LISA and ISA contributions, including redirection after age 50.
+    Args:
+        current_salary (float): Current annual salary.
+        age (int): Current age.
+        contrib (ContributionRates): Contribution rates.
+        lisa_limit (float): Annual LISA contribution limit.
+        isa_limit (float): Annual ISA contribution limit.
+    Returns:
+        dict: Calculated net/gross contributions and redirections.
+    """
+    # LISA contributions (only allowed under age 50)
     this_lisa_rate = contrib.lisa if age < 50 else 0.0
     lisa_net = current_salary * this_lisa_rate
     if lisa_net > lisa_limit:
@@ -96,7 +143,16 @@ def calculate_pension_contributions(
     contrib: ContributionRates,
     redirected_sipp_net: float,
 ) -> dict:
-    """Calculate SIPP and workplace pension contributions."""
+    """
+    Calculate SIPP and workplace pension contributions.
+    Args:
+        current_salary (float): Current annual salary.
+        base_for_workplace (float): Salary base for workplace pension (may be qualifying earnings).
+        contrib (ContributionRates): Contribution rates.
+        redirected_sipp_net (float): Amount redirected to SIPP from LISA after age 50.
+    Returns:
+        dict: Calculated net/gross contributions for SIPP and workplace pension.
+    """
     # SIPP personal contributions (employee) – relief at source
     sipp_employee_net = current_salary * contrib.sipp_employee + redirected_sipp_net
     sipp_employee_gross = sipp_employee_net / 0.8 if sipp_employee_net > 0 else 0.0
@@ -132,32 +188,23 @@ def project_retirement(
     use_qualifying_earnings: bool,
     year: int,
 ) -> pd.DataFrame:
-    """Compute the year‑by‑year contributions, tax relief and account balances.
+    """
+    Compute the year-by-year contributions, tax relief, and account balances.
 
-    Parameters
-    ----------
-    user : UserProfile
-        User profile including age, retirement age, salary, and region.
-    contrib : ContributionRates
-        Contribution rates for each wrapper and shift rates after age 50.
-    returns : InvestmentReturns
-        Expected annual rates of return for each wrapper.
-    inflation : float
-        Annual inflation rate used to index salary and contributions (decimal).
-    use_qualifying_earnings : bool
-        If True, workplace pension contributions are calculated on qualifying earnings
-        (£6,240–£50,270). Otherwise contributions are based on total salary.
-    year : int
-        Tax year to use for income tax calculations (e.g., 2025 for 2025/26).
+    Args:
+        user (UserProfile): User profile including age, retirement age, salary, and region.
+        contrib (ContributionRates): Contribution rates for each wrapper and shift rates after age 50.
+        returns (InvestmentReturns): Expected annual rates of return for each wrapper.
+        inflation (float): Annual inflation rate used to index salary and contributions (decimal).
+        use_qualifying_earnings (bool): If True, workplace pension contributions are calculated on qualifying earnings (£6,240–£50,270). Otherwise, contributions are based on total salary.
+        year (int): Tax year to use for income tax calculations (e.g., 2025 for 2025/26).
 
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with each year's age and financial metrics.
+    Returns:
+        pd.DataFrame: DataFrame with each year's age and financial metrics.
     """
     years = user.retirement_age - user.current_age
 
-    # Constants
+    # Load annual limits for the selected tax year
     limits = LIMITS_DB[str(year)]
     qualifying_lower = limits["qualifying_lower"]
     qualifying_upper = limits["qualifying_upper"]
@@ -167,6 +214,7 @@ def project_retirement(
 
     records: List[Dict] = []
 
+    # Initialize account pots and salary
     pot_lisa = 0.0
     pot_isa = 0.0
     pot_sipp = 0.0
@@ -176,7 +224,7 @@ def project_retirement(
     for year_index in range(years):
         age = user.current_age + year_index
 
-        # Determine the contribution bases
+        # Determine the contribution base for workplace pension
         if use_qualifying_earnings:
             qualifying_salary = min(
                 max(current_salary - qualifying_lower, 0),
@@ -186,6 +234,7 @@ def project_retirement(
         else:
             base_for_workplace = current_salary
 
+        # Calculate LISA/ISA contributions and redirections
         lisa_isa = calculate_lisa_isa_contributions(
             current_salary=current_salary,
             age=age,
@@ -199,6 +248,7 @@ def project_retirement(
         isa_net = lisa_isa["isa_net"]
         redirected_sipp_net = lisa_isa["redirected_sipp_net"]
 
+        # Calculate SIPP and workplace pension contributions
         pensions = calculate_pension_contributions(
             current_salary=current_salary,
             base_for_workplace=base_for_workplace,
@@ -223,6 +273,7 @@ def project_retirement(
         # Ensure we do not exceed annual allowance; cap employee contributions to respect the allowance
         if total_pension_gross > pension_annual_allowance:
             excess = total_pension_gross - pension_annual_allowance
+            # Reduce SIPP employee gross first
             if sipp_employee_gross >= excess:
                 sipp_employee_gross -= excess
                 sipp_employee_net = sipp_employee_gross * 0.8
@@ -231,6 +282,7 @@ def project_retirement(
                 excess -= sipp_employee_gross
                 sipp_employee_gross = 0
                 sipp_employee_net = 0
+                # Then reduce workplace employee gross
                 if wp_employee_gross >= excess:
                     wp_employee_gross -= excess
                     wp_employee_net = wp_employee_gross * 0.8
@@ -249,7 +301,7 @@ def project_retirement(
         )
         tax_relief_total = tax_before - tax_after
 
-        # 20 % basic relief has already been granted by the pension provider; additional relief is refundable
+        # 20% basic relief has already been granted by the pension provider; additional relief is refundable
         basic_relief = total_personal_gross * 0.20
         tax_refund = max(tax_relief_total - basic_relief, 0)
 
@@ -269,7 +321,7 @@ def project_retirement(
             + wp_employer_gross
         )
 
-        # Record results
+        # Record results for this year
         records.append(
             {
                 "Age": age,

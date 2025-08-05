@@ -1,8 +1,8 @@
 """
-Tax calculations for UK income tax and pension relief.
+Tax calculations for UK income tax and pension relief in Planwise.
 
-This module handles income tax calculations for both Scottish and rest-of-UK
-tax bands, including the calculation of tax relief on pension contributions.
+This module loads tax band data and provides functions to compute income tax for both
+Scottish and rest-of-UK tax bands, including the calculation of tax relief on pension contributions.
 """
 
 import json
@@ -13,31 +13,22 @@ from typing import List, Tuple
 
 @dataclass
 class TaxBand:
-    """Represents a single tax band."""
+    """
+    Represents a single tax band.
+    Attributes:
+        threshold (float): Lower threshold of the band.
+        rate (float): Marginal tax rate in decimal.
+    """
 
-    threshold: float  # lower threshold of the band
-    rate: float  # marginal tax rate in decimal
+    threshold: float
+    rate: float
 
 
 def load_tax_bands_db() -> dict:
     """
-    Loads tax band data from a JSON file and constructs a nested dictionary of tax bands by year and region.
-
-    The function reads the 'tax_bands.json' file located in the 'data' directory relative to the current file.
-    It parses the JSON content and converts each tax band entry into a TaxBand object.
-    The resulting dictionary is structured as follows:
-        {
-            year (int): {
-                region (str): {
-                    "personal_allowance": value,
-                    "bands": [TaxBand, ...]
-                },
-                ...
-            },
-            ...
-
+    Load tax band data from a JSON file and construct a nested dictionary of tax bands by year and region.
     Returns:
-        dict: A nested dictionary containing tax band information by year and region.
+        dict: Tax band information by year and region.
     """
     json_path = os.path.join(os.path.dirname(__file__), "data", "tax_bands.json")
     with open(json_path, "r") as f:
@@ -62,20 +53,16 @@ def load_tax_bands_db() -> dict:
 TAX_BANDS_DB = load_tax_bands_db()
 
 
-def get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[List[TaxBand], float]:
-    """Return income tax bands and personal allowance for the selected region and year.
-
-    Parameters
-    ----------
-    scotland : bool
-        True for Scottish tax bands; False for rest of UK.
-    year : int, optional
-        Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
-
-    Returns
-    -------
-    Tuple[List[TaxBand], float]
-        A tuple of (list of TaxBand, personal allowance)
+def get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[list, float]:
+    """
+    Return income tax bands and personal allowance for the selected region and year.
+    Args:
+        scotland (bool): True for Scottish tax bands; False for rest of UK.
+        year (int): Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
+    Returns:
+        tuple: (list of TaxBand, personal allowance)
+    Raises:
+        ValueError: If year is not found.
     """
     db = TAX_BANDS_DB.get(year)
     if db is None:
@@ -86,21 +73,14 @@ def get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[List[TaxBand], floa
 
 
 def calculate_income_tax(income: float, scotland: bool, year: int = 2025) -> float:
-    """Compute income tax payable on taxable income.
-
-    Parameters
-    ----------
-    income : float
-        Taxable income (after personal allowance and before relief adjustments).
-    scotland : bool
-        Use Scottish tax bands if True.
-    year : int, optional
-        Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
-
-    Returns
-    -------
-    float
-        Tax payable in pounds.
+    """
+    Compute income tax payable on taxable income.
+    Args:
+        income (float): Taxable income (after personal allowance and before relief adjustments).
+        scotland (bool): Use Scottish tax bands if True.
+        year (int): Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
+    Returns:
+        float: Tax payable in pounds.
     """
     bands, personal_allowance = get_tax_bands(scotland, year)
     # Remove personal allowance from income

@@ -1,8 +1,9 @@
 """
-Command-line interface for the planwise library.
+Command-line interface for the Planwise library.
 
-This module provides a CLI for running retirement projections and generating
-reports from the command line.
+This module provides a user-friendly CLI for running UK investment and retirement projections,
+generating reports, and saving results to CSV. It supports configuration via command-line arguments
+or a JSON config file.
 """
 
 import argparse
@@ -22,7 +23,11 @@ from .core import (
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create the command-line argument parser."""
+    """
+    Create the command-line argument parser for Planwise CLI.
+    Returns:
+        argparse.ArgumentParser: Configured argument parser.
+    """
     parser = argparse.ArgumentParser(
         description="UK Investment & Retirement Planning CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -44,7 +49,7 @@ Examples:
         """,
     )
 
-    # Basic parameters
+    # Basic user parameters
     parser.add_argument(
         "--current-age", type=int, default=30, help="Current age (default: 30)"
     )
@@ -171,7 +176,13 @@ Examples:
 
 
 def load_config(config_path: str) -> Any:
-    """Load configuration from JSON file."""
+    """
+    Load configuration from a JSON file.
+    Args:
+        config_path (str): Path to the JSON config file.
+    Returns:
+        dict: Loaded configuration.
+    """
     try:
         with open(config_path, "r") as f:
             return json.load(f)
@@ -181,7 +192,11 @@ def load_config(config_path: str) -> Any:
 
 
 def print_summary(df: pd.DataFrame) -> None:
-    """Print summary statistics."""
+    """
+    Print summary statistics for the retirement projection.
+    Args:
+        df (pd.DataFrame): DataFrame with projection results.
+    """
     final_row = df.iloc[-1]
     total_final = (
         final_row["Pot LISA"]
@@ -211,18 +226,21 @@ def print_summary(df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    """Main CLI entry point."""
+    """
+    Main CLI entry point for Planwise.
+    Parses arguments, runs the projection, and outputs results.
+    """
     parser = create_parser()
     args = parser.parse_args()
 
-    # Load config file if specified
+    # Optionally load config file and override args
     if args.config:
         config = load_config(args.config)
         for key, value in config.items():
             if hasattr(args, key.replace("-", "_")):
                 setattr(args, key.replace("-", "_"), value)
 
-    # Prepare dataclasses for new interface
+    # Prepare user, contribution, and return dataclasses
     user = UserProfile(
         current_age=args.current_age,
         retirement_age=args.retirement_age,
@@ -246,7 +264,7 @@ def main() -> None:
         workplace=args.roi_workplace,
     )
 
-    # Run projection
+    # Run the retirement projection
     try:
         df = project_retirement(
             user=user,
@@ -260,14 +278,16 @@ def main() -> None:
         print(f"Error running projection: {e}")
         sys.exit(1)
 
-    # Output results
+    # Output results to CSV if requested
     if args.output:
         df.to_csv(args.output, index=False)
         print(f"Results saved to {args.output}")
 
+    # Print summary if requested
     if args.summary:
         print_summary(df)
 
+    # Otherwise, print the full DataFrame
     if not args.output and not args.summary:
         print(df.to_string(index=False))
 

@@ -1,5 +1,8 @@
 """
-Tests for core retirement projection functionality.
+Tests for core retirement projection functionality in Planwise.
+
+These tests cover the main projection logic, LISA/ISA rules, pension caps, pot growth,
+qualifying earnings, and tax region differences.
 """
 
 import numpy as np
@@ -17,10 +20,14 @@ from planwise.core import (
 
 
 class TestProjectRetirement:
-    """Test the main projection function."""
+    """
+    Test the main projection function and related helpers.
+    """
 
     def test_basic_projection(self):
-        """Test a basic retirement projection."""
+        """
+        Test a basic retirement projection for correct DataFrame structure and columns.
+        """
         user = UserProfile(
             current_age=30,
             retirement_age=35,
@@ -82,7 +89,9 @@ class TestProjectRetirement:
             assert col in result.columns
 
     def test_lisa_age_restriction(self):
-        """Test that LISA contributions stop at age 50."""
+        """
+        Test that LISA contributions stop at age 50 and are redirected appropriately.
+        """
         user = UserProfile(
             current_age=48,
             retirement_age=52,
@@ -127,7 +136,9 @@ class TestProjectRetirement:
         assert result.loc[result["Age"] == 51, "ISA Net"].iloc[0] > 0
 
     def test_lisa_bonus_calculation(self):
-        """Test LISA bonus is calculated correctly."""
+        """
+        Test LISA bonus is calculated as 25% of net contribution, capped at limit.
+        """
         user = UserProfile(
             current_age=30,
             retirement_age=31,
@@ -208,7 +219,9 @@ class TestProjectRetirement:
     #     assert total_pension <= 60000.1  # Allow for small rounding
 
     def test_pot_growth(self):
-        """Test that pots grow with returns."""
+        """
+        Test that all pots grow with positive returns.
+        """
         user = UserProfile(
             current_age=30,
             retirement_age=32,
@@ -246,7 +259,9 @@ class TestProjectRetirement:
             assert result.iloc[1][col] > result.iloc[0][col]
 
     def test_qualifying_earnings_calculation(self):
-        """Test workplace pension contributions with qualifying earnings."""
+        """
+        Test workplace pension contributions are based on qualifying earnings when enabled.
+        """
         # Test with salary below qualifying band
         user = UserProfile(
             current_age=30,
@@ -290,7 +305,9 @@ class TestProjectRetirement:
 
     @pytest.mark.parametrize("scotland", [False, True])
     def test_scottish_vs_uk_tax(self, scotland):
-        """Test that Scottish and UK tax calculations produce different results."""
+        """
+        Test that Scottish and UK tax calculations produce different results for the same salary.
+        """
         user = UserProfile(
             current_age=30,
             retirement_age=31,
@@ -327,6 +344,9 @@ class TestProjectRetirement:
         assert tax_relief > 0
 
     def test_lisa_isa_under_50(self):
+        """
+        Test LISA and ISA contributions under age 50, no redirection.
+        """
         contrib = ContributionRates(
             lisa=0.10,
             isa=0.05,
@@ -354,6 +374,9 @@ class TestProjectRetirement:
         assert result["redirected_sipp_net"] == 0
 
     def test_lisa_isa_lisa_cap(self):
+        """
+        Test LISA contributions are capped at the annual limit.
+        """
         contrib = ContributionRates(
             lisa=0.20,
             isa=0.0,
@@ -377,6 +400,9 @@ class TestProjectRetirement:
         assert result["lisa_gross"] == 5000
 
     def test_lisa_isa_over_50_redirection(self):
+        """
+        Test LISA contributions are redirected to ISA and SIPP after age 50.
+        """
         contrib = ContributionRates(
             lisa=0.10,
             isa=0.05,
@@ -403,6 +429,9 @@ class TestProjectRetirement:
         assert result["redirected_sipp_net"] == 0.4 * 3000  # 1200
 
     def test_isa_cap_with_lisa(self):
+        """
+        Test ISA contributions are capped when LISA is also used.
+        """
         contrib = ContributionRates(
             lisa=0.20,
             isa=0.20,
@@ -426,6 +455,9 @@ class TestProjectRetirement:
         assert result["lisa_gross"] == 5000
 
     def test_pension_contributions_basic(self):
+        """
+        Test basic SIPP and workplace pension contribution calculations.
+        """
         contrib = ContributionRates(
             lisa=0.0,
             isa=0.0,
@@ -459,6 +491,9 @@ class TestProjectRetirement:
         assert abs(result["wp_employer_gross"] - 800) < 0.01
 
     def test_pension_contributions_with_redirection(self):
+        """
+        Test SIPP contributions with redirected amounts from LISA.
+        """
         contrib = ContributionRates(
             lisa=0.0,
             isa=0.0,
@@ -491,6 +526,9 @@ class TestProjectRetirement:
         assert result["wp_employer_gross"] == 0
 
     def test_pension_contributions_zero(self):
+        """
+        Test all pension contributions are zero when salary and rates are zero.
+        """
         contrib = ContributionRates(
             lisa=0.0,
             isa=0.0,
@@ -520,7 +558,9 @@ class TestProjectRetirement:
         assert result["wp_employer_gross"] == 0
 
     def test_load_limits_db(self):
-        """Test that load_limits_db loads the limits JSON and contains expected keys."""
+        """
+        Test that load_limits_db loads the limits JSON and contains expected keys.
+        """
         from planwise.core import load_limits_db
 
         limits = load_limits_db()

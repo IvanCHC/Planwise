@@ -1,3 +1,9 @@
+"""
+Tests for National Insurance (NI) calculations in Planwise.
+
+These tests cover NI band retrieval, error handling, and NI calculation logic.
+"""
+
 import pytest
 
 from planwise import ni
@@ -10,6 +16,9 @@ class DummyBand:
 
 
 def test_get_ni_bands_valid(monkeypatch):
+    """
+    Test NI band retrieval for a valid year and category.
+    """
     # Patch NI_BANDS_DB to a known value
     monkeypatch.setattr(
         ni,
@@ -30,18 +39,27 @@ def test_get_ni_bands_valid(monkeypatch):
 
 
 def test_get_ni_bands_invalid_year(monkeypatch):
+    """
+    Test ValueError is raised for an invalid year.
+    """
     monkeypatch.setattr(ni, "NI_BANDS_DB", {2025: {}})
     with pytest.raises(ValueError):
         ni.get_ni_bands(2024, "category_a")
 
 
 def test_get_ni_bands_invalid_category(monkeypatch):
+    """
+    Test ValueError is raised for an invalid category.
+    """
     monkeypatch.setattr(ni, "NI_BANDS_DB", {2025: {"category_b": []}})
     with pytest.raises(ValueError):
         ni.get_ni_bands(2025, "category_a")
 
 
 def test_calculate_ni_single_band(monkeypatch):
+    """
+    Test NI calculation for a single band and at threshold.
+    """
     monkeypatch.setattr(
         ni,
         "get_ni_bands",
@@ -54,6 +72,9 @@ def test_calculate_ni_single_band(monkeypatch):
 
 
 def test_calculate_ni_multiple_bands(monkeypatch):
+    """
+    Test NI calculation for multiple bands and income in each band.
+    """
     monkeypatch.setattr(
         ni,
         "get_ni_bands",
@@ -70,6 +91,9 @@ def test_calculate_ni_multiple_bands(monkeypatch):
 
 
 def test_calculate_ni_zero_income(monkeypatch):
+    """
+    Test NI calculation returns 0 for zero income.
+    """
     monkeypatch.setattr(
         ni,
         "get_ni_bands",
@@ -79,6 +103,9 @@ def test_calculate_ni_zero_income(monkeypatch):
 
 
 def test_calculate_ni_exact_band_thresholds(monkeypatch):
+    """
+    Test NI calculation at exact band thresholds.
+    """
     monkeypatch.setattr(
         ni,
         "get_ni_bands",
@@ -93,6 +120,9 @@ def test_calculate_ni_exact_band_thresholds(monkeypatch):
 
 
 def test_calculate_ni_negative_income(monkeypatch):
+    """
+    Test NI calculation returns 0 for negative income.
+    """
     monkeypatch.setattr(
         ni,
         "get_ni_bands",

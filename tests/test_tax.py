@@ -1,5 +1,8 @@
 """
-Tests for tax calculations.
+Tests for tax calculations in Planwise.
+
+These tests cover the TaxBand dataclass, tax band retrieval, income tax calculation,
+and loading of the tax bands database.
 """
 
 import pytest
@@ -8,20 +11,28 @@ from planwise.tax import TaxBand, calculate_income_tax, get_tax_bands, load_tax_
 
 
 class TestTaxBand:
-    """Test the TaxBand dataclass."""
+    """
+    Test the TaxBand dataclass.
+    """
 
     def test_tax_band_creation(self):
-        """Test creating a TaxBand instance."""
+        """
+        Test creating a TaxBand instance and its attributes.
+        """
         band = TaxBand(threshold=12570, rate=0.20)
         assert band.threshold == 12570
         assert band.rate == 0.20
 
 
 class TestGetTaxBands:
-    """Test tax band retrieval functions."""
+    """
+    Test tax band retrieval functions for UK and Scotland.
+    """
 
     def test_get_uk_tax_bands(self):
-        """Test getting rest-of-UK tax bands."""
+        """
+        Test getting rest-of-UK tax bands and their structure.
+        """
         bands, personal_allowance = get_tax_bands(scotland=False, year=2025)
 
         assert personal_allowance == 12_570.0
@@ -38,7 +49,9 @@ class TestGetTaxBands:
         assert bands[3].rate == 0.45
 
     def test_get_scottish_tax_bands(self):
-        """Test getting Scottish tax bands."""
+        """
+        Test getting Scottish tax bands and their structure.
+        """
         bands, personal_allowance = get_tax_bands(scotland=True, year=2025)
 
         assert personal_allowance == 12_570.0
@@ -51,7 +64,9 @@ class TestGetTaxBands:
         assert bands[-1].rate == 0.48
 
     def test_year_not_found(self):
-        """Test ValueError is raised when year is not found."""
+        """
+        Test ValueError is raised when year is not found in the tax bands DB.
+        """
         import pytest
 
         with pytest.raises(ValueError, match="No tax band data for year 2024"):
@@ -59,10 +74,14 @@ class TestGetTaxBands:
 
 
 class TestCalculateIncomeTax:
-    """Test income tax calculation functions."""
+    """
+    Test income tax calculation functions for various scenarios.
+    """
 
     def test_no_tax_below_personal_allowance(self):
-        """Test no tax is payable below personal allowance."""
+        """
+        Test no tax is payable below the personal allowance threshold.
+        """
         tax = calculate_income_tax(10_000, scotland=False, year=2025)
         assert tax == 0.0
 
@@ -70,14 +89,18 @@ class TestCalculateIncomeTax:
         assert tax == 0.0
 
     def test_basic_rate_tax_uk(self):
-        """Test basic rate tax calculation for UK."""
+        """
+        Test basic rate tax calculation for UK income.
+        """
         # £20,000 income: (20,000 - 12,570) * 0.20 = £1,486
         tax = calculate_income_tax(20_000, scotland=False, year=2025)
         expected = (20_000 - 12_570) * 0.20
         assert tax == pytest.approx(expected, rel=0.01)
 
     def test_higher_rate_tax_uk(self):
-        """Test higher rate tax calculation for UK."""
+        """
+        Test higher rate tax calculation for UK income.
+        """
         # £60,000 income
         income = 60_000
         tax = calculate_income_tax(income, scotland=False, year=2025)
@@ -94,7 +117,9 @@ class TestCalculateIncomeTax:
         assert tax == pytest.approx(expected, rel=0.01)
 
     def test_scottish_tax_calculation(self):
-        """Test Scottish tax calculation."""
+        """
+        Test Scottish tax calculation for a specific income.
+        """
         # £30,000 income in Scotland
         income = 30_000
         tax = calculate_income_tax(income, scotland=True, year=2025)
@@ -111,7 +136,9 @@ class TestCalculateIncomeTax:
         assert abs(tax - expected) < 0.01
 
     def test_additional_rate_tax_uk(self):
-        """Test additional rate tax for very high earners."""
+        """
+        Test additional rate tax for very high UK earners.
+        """
         income = 150_000
         tax = calculate_income_tax(income, scotland=False, year=2025)
 
@@ -139,12 +166,16 @@ class TestCalculateIncomeTax:
         ],
     )
     def test_tax_is_non_negative(self, income, scotland):
-        """Test that tax calculations never return negative values."""
+        """
+        Test that tax calculations never return negative values for any income or region.
+        """
         tax = calculate_income_tax(income, scotland, year=2025)
         assert tax >= 0
 
     def test_tax_increases_with_income(self):
-        """Test that tax generally increases with income."""
+        """
+        Test that tax generally increases with income for both UK and Scotland.
+        """
         incomes = [10_000, 20_000, 40_000, 60_000, 100_000, 150_000]
 
         for scotland in [False, True]:
@@ -158,9 +189,14 @@ class TestCalculateIncomeTax:
 
 
 class TestLoadTaxBandsDB:
-    """Test loading of tax bands database."""
+    """
+    Test loading of tax bands database structure and contents.
+    """
 
     def test_load_tax_bands_db_structure(self):
+        """
+        Test that the tax bands DB loads and has the expected structure and keys.
+        """
         db = load_tax_bands_db()
         assert isinstance(db, dict)
         assert 2025 in db

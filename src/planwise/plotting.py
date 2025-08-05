@@ -1,8 +1,8 @@
 """
-Plotting functions for visualizing retirement projections.
+Plotting functions for visualizing retirement projections in Planwise.
 
-This module provides functions to create charts for contribution analysis
-and growth projections using Altair.
+This module provides functions to create Altair charts for contribution analysis
+and growth projections, including combined visualizations.
 """
 
 from typing import Optional
@@ -12,23 +12,19 @@ import pandas as pd
 
 
 def make_contribution_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart:
-    """Create a stacked bar chart showing net contributions to each wrapper per year.
+    """
+    Create a stacked bar chart showing net contributions to each wrapper per year.
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing projection results from project_retirement.
-    title : str, optional
-        Custom title for the chart. If None, uses default title.
-
-    Returns
-    -------
-    alt.Chart
-        Altair chart object showing contribution breakdown.
+    Args:
+        df (pd.DataFrame): DataFrame containing projection results from project_retirement.
+        title (str, optional): Custom title for the chart. If None, uses default title.
+    Returns:
+        alt.Chart: Altair chart object showing contribution breakdown.
     """
     if title is None:
         title = "Net contributions by account (share of total)"
 
+    # Melt the DataFrame to long format for Altair
     plot_df = df.melt(
         id_vars=["Age"],
         value_vars=[
@@ -57,23 +53,19 @@ def make_contribution_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt
 
 
 def make_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart:
-    """Create a line chart for each pot's nominal value over time.
+    """
+    Create a line chart for each pot's nominal value over time.
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing projection results from project_retirement.
-    title : str, optional
-        Custom title for the chart. If None, uses default title.
-
-    Returns
-    -------
-    alt.Chart
-        Altair chart object showing pot growth over time.
+    Args:
+        df (pd.DataFrame): DataFrame containing projection results from project_retirement.
+        title (str, optional): Custom title for the chart. If None, uses default title.
+    Returns:
+        alt.Chart: Altair chart object showing pot growth over time.
     """
     if title is None:
-        title = "Pre‑retirement nominal growth of each pot"
+        title = "Pre-retirement nominal growth of each pot"
 
+    # Melt the DataFrame to long format for Altair
     plot_df = df.melt(
         id_vars=["Age"],
         value_vars=["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"],
@@ -95,21 +87,18 @@ def make_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart
 
 
 def make_combined_plot(df: pd.DataFrame) -> alt.Chart:
-    """Create a combined chart showing both contributions and growth.
+    """
+    Create a combined chart showing both contributions and growth.
 
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame containing projection results from project_retirement.
-
-    Returns
-    -------
-    alt.Chart
-        Combined Altair chart with contributions and growth.
+    Args:
+        df (pd.DataFrame): DataFrame containing projection results from project_retirement.
+    Returns:
+        alt.Chart: Combined Altair chart with contributions and growth.
     """
     contrib_chart = make_contribution_plot(df, "Annual Contributions by Account")
     growth_chart = make_growth_plot(df, "Pot Growth Over Time")
 
+    # Horizontally concatenate the two charts
     combined = alt.hconcat(contrib_chart, growth_chart).resolve_scale(
         color="independent"
     )

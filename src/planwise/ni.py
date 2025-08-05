@@ -1,3 +1,10 @@
+"""
+National Insurance (NI) calculations for UK employees.
+
+This module loads NI band data and provides functions to compute employee NI contributions
+for a given year and category.
+"""
+
 import json
 import os
 from dataclasses import dataclass
@@ -6,13 +13,22 @@ from typing import Any
 
 @dataclass
 class NICBand:
-    threshold: float  # lower threshold of the band
-    rate: float  # NI rate as a decimal
+    """
+    Represents a single National Insurance band.
+    Attributes:
+        threshold (float): Lower threshold of the band.
+        rate (float): NI rate as a decimal.
+    """
+
+    threshold: float
+    rate: float
 
 
 def load_ni_bands_db() -> dict:
     """
-    Loads NI band data from a JSON file and constructs a nested dictionary of NI bands by year and category.
+    Load NI band data from a JSON file and construct a nested dictionary of NI bands by year and category.
+    Returns:
+        dict: NI bands by year and category.
     """
     json_path = os.path.join(os.path.dirname(__file__), "data", "ni_bands.json")
     with open(json_path, "r") as f:
@@ -36,7 +52,14 @@ NI_BANDS_DB = load_ni_bands_db()
 
 def get_ni_bands(year: int = 2025, category: str = "category_a") -> Any:
     """
-    Returns the National Insurance bands for the given year and category.
+    Return the National Insurance bands for the given year and category.
+    Args:
+        year (int): Tax year.
+        category (str): NI category (e.g., 'category_a').
+    Returns:
+        list[NICBand]: List of NI bands for the year and category.
+    Raises:
+        ValueError: If year or category is not found.
     """
     db = NI_BANDS_DB.get(year)
     if db is None:
@@ -53,20 +76,15 @@ def calculate_ni(
     """
     Compute employee National Insurance contributions for the given category.
 
-    Parameters
-    ----------
-    income : float
-        Gross annual income.
-    year : int, optional
-        Tax year (default 2025).
-    category : str, optional
-        NI category (default "category_a").
-
-    Returns
-    -------
-    float
-        National Insurance contribution due.
+    Args:
+        income (float): Gross annual income.
+        year (int): Tax year (default 2025).
+        category (str): NI category (default 'category_a').
+    Returns:
+        float: National Insurance contribution due.
     """
+    if income <= 0:
+        return 0.0
     bands = get_ni_bands(year, category)
     ni_due = 0.0
     previous_threshold = 0.0

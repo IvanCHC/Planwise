@@ -1,5 +1,8 @@
 """
-Tests for plotting functionality.
+Tests for plotting functionality in Planwise.
+
+These tests cover the creation and structure of Altair charts for contributions and pot growth,
+as well as integration with real projection data.
 """
 
 import pandas as pd
@@ -14,7 +17,11 @@ from planwise.plotting import (
 
 @pytest.fixture
 def sample_projection_data():
-    """Create sample projection data for testing."""
+    """
+    Create sample projection data for testing plotting functions.
+    Returns:
+        pd.DataFrame: Sample projection data.
+    """
     data = {
         "Age": [30, 31, 32],
         "Salary": [40000, 40800, 41616],
@@ -39,10 +46,14 @@ def sample_projection_data():
 
 
 class TestMakeContributionPlot:
-    """Test contribution plotting function."""
+    """
+    Test the contribution plotting function.
+    """
 
     def test_contribution_plot_creation(self, sample_projection_data):
-        """Test that contribution plot is created successfully."""
+        """
+        Test that contribution plot is created successfully and is an Altair chart.
+        """
         chart = make_contribution_plot(sample_projection_data)
 
         # Check it's an Altair chart
@@ -54,7 +65,9 @@ class TestMakeContributionPlot:
         assert "encoding" in chart_dict
 
     def test_contribution_plot_with_custom_title(self, sample_projection_data):
-        """Test contribution plot with custom title."""
+        """
+        Test contribution plot with a custom title.
+        """
         custom_title = "Custom Contribution Analysis"
         chart = make_contribution_plot(sample_projection_data, title=custom_title)
 
@@ -62,7 +75,9 @@ class TestMakeContributionPlot:
         assert chart_dict["title"] == custom_title
 
     def test_contribution_plot_data_structure(self, sample_projection_data):
-        """Test that the plot uses the correct data structure."""
+        """
+        Test that the plot uses the correct data structure and encodings.
+        """
         chart = make_contribution_plot(sample_projection_data)
         chart_dict = chart.to_dict()
 
@@ -73,10 +88,14 @@ class TestMakeContributionPlot:
 
 
 class TestMakeGrowthPlot:
-    """Test growth plotting function."""
+    """
+    Test the growth plotting function.
+    """
 
     def test_growth_plot_creation(self, sample_projection_data):
-        """Test that growth plot is created successfully."""
+        """
+        Test that growth plot is created successfully and is an Altair chart.
+        """
         chart = make_growth_plot(sample_projection_data)
 
         # Check it's an Altair chart
@@ -88,7 +107,9 @@ class TestMakeGrowthPlot:
         assert "encoding" in chart_dict
 
     def test_growth_plot_with_custom_title(self, sample_projection_data):
-        """Test growth plot with custom title."""
+        """
+        Test growth plot with a custom title.
+        """
         custom_title = "Custom Growth Analysis"
         chart = make_growth_plot(sample_projection_data, title=custom_title)
 
@@ -96,7 +117,9 @@ class TestMakeGrowthPlot:
         assert chart_dict["title"] == custom_title
 
     def test_growth_plot_data_structure(self, sample_projection_data):
-        """Test that the plot uses the correct data structure."""
+        """
+        Test that the plot uses the correct data structure and encodings.
+        """
         chart = make_growth_plot(sample_projection_data)
         chart_dict = chart.to_dict()
 
@@ -107,10 +130,14 @@ class TestMakeGrowthPlot:
 
 
 class TestMakeCombinedPlot:
-    """Test combined plotting function."""
+    """
+    Test the combined plotting function.
+    """
 
     def test_combined_plot_creation(self, sample_projection_data):
-        """Test that combined plot is created successfully."""
+        """
+        Test that combined plot is created successfully and is an Altair chart.
+        """
         chart = make_combined_plot(sample_projection_data)
 
         # Check it's an Altair chart
@@ -123,10 +150,14 @@ class TestMakeCombinedPlot:
 
 @pytest.mark.integration
 class TestPlottingIntegration:
-    """Integration tests for plotting with real projections."""
+    """
+    Integration tests for plotting with real projection data.
+    """
 
     def test_plotting_with_real_projection(self):
-        """Test plotting functions work with real projection data."""
+        """
+        Test plotting functions work with real projection data from the core module.
+        """
         # This would require importing core module
         # Skip if altair not available
         try:
