@@ -76,6 +76,23 @@ class InvestmentReturns:
     workplace: float
 
 
+@dataclass
+class IncomeBreakdown:
+    """
+    Breakdown of income sources for retirement projection.
+    Attributes:
+        salary (float): Annual salary.
+        take_home_salary (float): Net salary after tax and NI.
+        income_tax (float): Total income tax due.
+        ni_due (float): National Insurance contributions due.
+    """
+
+    salary: float
+    take_home_salary: float
+    income_tax: float
+    ni_due: float
+
+
 def load_limits_db() -> Any:
     """
     Load annual limits and constants from JSON file.

@@ -3,6 +3,26 @@ Streamlit web application for UK Investment & Retirement Planning.
 
 This app provides an interactive interface to the planwise library,
 allowing users to model their retirement savings across various UK tax wrappers.
+
+This module defines a Streamlit application that models UK investment and
+retirement planning. The original implementation packed most of the UI logic
+into a single function. To improve readability and maintainability, the
+application has been refactored into smaller helper functions, each
+responsible for a logical section of the user interface. Detailed comments
+explain the purpose of each section and important calculations.
+
+The high–level flow is:
+
+1. The sidebar collects user inputs: personal details, tax settings,
+   contribution rates, post‑50 LISA redirection, and expected returns.
+2. These values are combined to instantiate planwise objects that model
+   retirement growth.
+3. The main area displays summary metrics, a breakdown of final pot values,
+   a detailed data table, charts and a download button.
+
+Keep in mind that this model is a simplification. It does not account for
+carry forward of unused allowances and assumes relief at source for pension
+contributions.
 """
 
 from typing import Any, Tuple
@@ -13,31 +33,53 @@ import streamlit as st
 # Import from our library
 import planwise as pw
 
+# -----------------------------------------------------------------------------
+# Sidebar helper functions
+#
+# The sidebar in this application is broken down into discrete sections for
+# collecting user input. Each helper function below is responsible for
+# rendering a specific section of the sidebar and returning the relevant
+# values. Splitting the UI in this way makes the code easier to follow and
+# modify.
 
-def sidebar_inputs() -> (
-    Tuple[
-        "pw.core.UserProfile",
-        "pw.core.ContributionRates",
-        "pw.core.InvestmentReturns",
-        float,
-        bool,
-        int,
-        int,
-        int,
-    ]
-):
+
+def select_tax_year() -> Any:
+    """Let the user choose the tax year used for calculations.
+
+    Returns
+    -------
+    int
+        The selected tax year as an integer (e.g. 2024 for the 2024/25 year).
+
+    Notes
+    -----
+    Planwise stores tax bands and limits keyed by the starting year of the
+    fiscal year. The selectbox displays years in the format "YYYY/YY" for
+    clarity.
+    """
     tax_band_db = pw.tax.load_tax_bands_db()
     available_years = sorted(tax_band_db.keys())
     default_year = max(available_years)
-    tax_year = st.sidebar.selectbox(
+    return st.sidebar.selectbox(
         "Tax year for calculations",
         options=available_years,
         index=available_years.index(default_year),
         format_func=lambda y: f"{y}/{str(y+1)[-2:]}",
     )
 
+
+def personal_details_section(
+    scotland: bool,
+) -> Tuple[int, int, float, float, float, float]:
+    """Collect personal details such as age and salary from the user, and show take-home pay.
+
+    Returns
+    -------
+    Tuple[int, int, float, float]
+        A tuple containing the current age, retirement age, annual salary, and take-home salary.
+    """
     with st.sidebar.expander("Personal Details", expanded=True):
-        current_age = st.number_input(
+        current_age: int = st.number_input(
             "Current age",
             min_value=18,
             max_value=74,
@@ -45,7 +87,7 @@ def sidebar_inputs() -> (
             step=1,
             key="current_age",
         )
-        retirement_age = st.number_input(
+        retirement_age: int = st.number_input(
             "Retirement age",
             min_value=current_age + 1,
             max_value=90,
@@ -53,7 +95,7 @@ def sidebar_inputs() -> (
             step=1,
             key="retirement_age",
         )
-        salary = st.number_input(
+        salary: float = st.number_input(
             "Annual salary (£)",
             min_value=1_000.0,
             max_value=1_000_000.0,
@@ -62,23 +104,139 @@ def sidebar_inputs() -> (
             key="salary",
         )
 
+        # --- Calculate NI and Tax ---
+        # Import here to avoid circular import if planwise uses this app
+        tax_year = None
+        # Try to get the selected tax year from session state if available
+        if "tax_year" in st.session_state:
+            tax_year = st.session_state["tax_year"]
+        else:
+            # Fallback: use latest year in DB
+            tax_band_db = pw.tax.load_tax_bands_db()
+            tax_year = max(tax_band_db.keys())
+
+        # Assume category A for NI and not Scottish by default
+        ni_due = pw.calculate_ni(salary, year=tax_year, category="category_a")
+        # Use planwise tax calculation for income tax (not including pension relief)
+        # Assume standard personal allowance, not Scottish
+        income_tax = pw.calculate_income_tax(salary, year=tax_year, scotland=scotland)
+
+        take_home_salary = salary - ni_due - income_tax
+        take_home_pct = take_home_salary / salary if salary > 0 else 0
+
+        st.write(f"**Estimated take-home salary:** £{take_home_salary:,.0f}")
+        st.progress(
+            min(take_home_pct, 1.0),
+            text=f"Take-home: {take_home_pct:.0%} of gross salary",
+        )
+
+    return current_age, retirement_age, salary, take_home_salary, ni_due, income_tax
+
+
+def tax_settings_section(tax_year: int) -> Tuple[bool, bool, float, float, float]:
+    """Collect tax‑related settings.
+
+    Parameters
+    ----------
+    tax_year : int
+        The start year of the tax year (e.g. 2024 for 2024/25) used to look up
+        qualifying earnings thresholds.
+
+    Returns
+    -------
+    Tuple[bool, bool, float, float, float]
+        A tuple containing:
+        - `scotland`: whether the taxpayer is Scottish (affects income tax bands).
+        - `use_qualifying`: whether workplace pension contributions use qualifying
+          earnings instead of total salary.
+        - `qualifying_earnings`: difference between qualifying upper and lower
+          bounds.
+        - `qualifying_upper`: upper bound for qualifying earnings.
+        - `qualifying_lower`: lower bound for qualifying earnings.
+    """
     with st.sidebar.expander("Tax Settings", expanded=False):
-        scotland = st.checkbox("Scottish taxpayer?", value=False, key="scotland")
-        use_qualifying = st.checkbox(
+        scotland: bool = st.checkbox(
+            "Scottish taxpayer?",
+            value=False,
+            key="scotland",
+        )
+        use_qualifying: bool = st.checkbox(
             "Calculate workplace contributions using qualifying earnings band?",
             value=False,
-            help="If checked, workplace pension contributions are calculated on qualifying earnings (£6,240–£50,270). Otherwise contributions are based on total salary.",
+            help=(
+                "If checked, workplace pension contributions are calculated "
+                "on qualifying earnings (£6,240–£50,270). Otherwise "
+                "contributions are based on total salary."
+            ),
             key="use_qualifying",
         )
-        qualifying_earnings = (
-            pw.core.LIMITS_DB[str(tax_year)]["qualifying_upper"]
-            - pw.core.LIMITS_DB[str(tax_year)]["qualifying_lower"]
-        )
+        # Fetch qualifying thresholds from the limits database for the selected
+        # tax year. These are used to compute pension contributions when the
+        # qualifying earnings option is selected.
         qualifying_upper = pw.core.LIMITS_DB[str(tax_year)]["qualifying_upper"]
         qualifying_lower = pw.core.LIMITS_DB[str(tax_year)]["qualifying_lower"]
+        qualifying_earnings = qualifying_upper - qualifying_lower
+    return (
+        scotland,
+        use_qualifying,
+        qualifying_earnings,
+        qualifying_upper,
+        qualifying_lower,
+    )
 
-    with st.sidebar.expander("Contribution rates (as % of salary)", expanded=True):
-        # LISA contribution rate
+
+def contribution_rates_section(
+    tax_year: int,
+    salary: float,
+    use_qualifying: bool,
+    qualifying_earnings: float,
+    qualifying_upper: float,
+    qualifying_lower: float,
+    scotland: bool,
+) -> Tuple[float, float, float, float, float, float, float, float, float, float,]:
+    """Collect contribution rates for each tax wrapper.
+
+    This function handles the complex logic of enforcing annual allowances and
+    computing maximum contribution rates for Lifetime ISA (LISA), Stocks & Shares
+    ISA, Self‑Invested Personal Pension (SIPP) and workplace pension (employee
+    and employer). It returns the chosen rates along with information needed
+    for downstream calculations (e.g. unused salary and allowance).
+
+    Parameters
+    ----------
+    tax_year : int
+        The start year of the tax year for looking up contribution limits.
+    salary : float
+        Annual salary in pounds.
+    use_qualifying : bool
+        Whether to base workplace pension contributions on qualifying earnings.
+    qualifying_earnings : float
+        Difference between qualifying upper and lower bounds.
+    qualifying_upper : float
+        Upper bound of qualifying earnings.
+    qualifying_lower : float
+        Lower bound of qualifying earnings.
+
+    Returns
+    -------
+    Tuple
+        A tuple containing (in order):
+        - `lisa_rate`: fraction of salary contributed to LISA.
+        - `isa_rate`: fraction of salary contributed to ISA (after LISA).
+        - `sipp_employee_rate`: employee contribution to SIPP (salary %).
+        - `sipp_employer_rate`: employer contribution to SIPP (salary %).
+        - `workplace_employee_rate`: employee contribution to workplace pension.
+        - `workplace_employer_rate`: employer contribution to workplace pension.
+        - `unused_allowance`: remaining pension annual allowance after all contributions.
+        - `unused_salary`: remaining take‑home salary not allocated to ISA/LISA/pensions.
+        - `total_lisa`: actual pound amount contributed to LISA (salary × rate).
+        - `total_contrib_rate`: combined contribution rate used to display a progress
+          bar in the sidebar.
+    """
+    with st.sidebar.expander(
+        "Contribution rates (as % of take home salary)", expanded=True
+    ):
+        # --------- LISA contributions ---------
         lisa_limit = pw.core.LIMITS_DB[str(tax_year)]["lisa_limit"]
         max_lisa_rate = min(lisa_limit / salary, 1.0)
         lisa_rate = st.slider(
@@ -96,10 +254,12 @@ def sidebar_inputs() -> (
                 "Any value above this will be capped in calculations."
             )
 
-        # ISA contribution rate
+        # --------- ISA contributions ---------
         isa_limit = pw.core.LIMITS_DB[str(tax_year)]["isa_limit"]
-        lisa_net = salary * lisa_rate
-        remaining_isa_allowance = max(isa_limit - lisa_net, 0.0)
+        # Amount contributed to LISA in pounds
+        total_lisa = salary * lisa_rate
+        # Remaining ISA allowance after LISA contributions
+        remaining_isa_allowance = max(isa_limit - total_lisa, 0.0)
         max_isa_rate = min(remaining_isa_allowance / salary, 1.0)
         isa_rate = st.slider(
             "ISA contribution %",
@@ -110,13 +270,15 @@ def sidebar_inputs() -> (
             key="isa_rate",
             help=f"Max allowed by ISA limit (£{isa_limit:,.0f}) after LISA contributions",
         )
-        total_lisa_isa = lisa_rate * salary + isa_rate * salary
+        # Keep track of unallocated salary for subsequent pension contributions
+        total_lisa_isa = total_lisa + isa_rate * salary
         unused_salary = salary - total_lisa_isa
 
-        # Pension contribution rates
+        # --------- Pension contributions ---------
         pension_annual_allowance = pw.core.LIMITS_DB[str(tax_year)][
             "pension_annual_allowance"
         ]
+        # Employer contribution to workplace pension (always allowed on full salary)
         workplace_employer_rate = st.slider(
             "Workplace pension (employer) %",
             0.0,
@@ -126,7 +288,9 @@ def sidebar_inputs() -> (
             key="workplace_employer_rate",
             help=f"Max allowed by pension annual allowance (£{pension_annual_allowance:,.0f})",
         )
+        # Determine the allowance remaining after employer contributions
         if use_qualifying:
+            # Only the portion of salary between qualifying_lower and qualifying_upper is subject to workplace contributions
             salary_factor = (
                 salary - qualifying_lower
                 if salary < qualifying_upper
@@ -141,7 +305,12 @@ def sidebar_inputs() -> (
             )
 
         warning_flag = False
+        # Default values for optional contributions
+        sipp_employer_rate = 0.0
+        workplace_employee_rate = 0.0
+        sipp_employee_rate = 0.0
 
+        # Employer contributions to SIPP (if any)
         if unused_allowance <= 0:
             st.warning(
                 f"⚠️ The maximum pension contribution is capped by the annual allowance (£{pension_annual_allowance:,.0f}). "
@@ -159,8 +328,10 @@ def sidebar_inputs() -> (
                 key="sipp_employer_rate",
                 help=f"Max allowed by pension annual allowance (£{pension_annual_allowance:,.0f})",
             )
+            # Update allowance after employer SIPP contributions
             unused_allowance -= sipp_employer_rate * salary
 
+        # Employee contributions to workplace pension
         if unused_allowance <= 0:
             if not warning_flag:
                 st.warning(
@@ -206,12 +377,12 @@ def sidebar_inputs() -> (
                 unused_salary -= workplace_employee_rate * salary
                 unused_allowance -= workplace_employee_rate * salary * 1.25
 
+        # Employee contributions to SIPP
         if unused_allowance <= 0:
             if not warning_flag:
                 st.warning(
                     f"⚠️ The maximum pension contribution is capped by the annual allowance (£{pension_annual_allowance:,.0f}). "
                 )
-                warning_flag = True
             sipp_employee_rate = 0.0
         elif unused_salary <= 0:
             st.warning(
@@ -233,12 +404,17 @@ def sidebar_inputs() -> (
                 key="sipp_employee_rate",
                 help=f"Max allowed by pension annual allowance (£{pension_annual_allowance:,.0f})",
             )
+            # Update unused salary and allowance after SIPP contributions
             unused_salary -= sipp_employee_rate * salary
             unused_allowance -= (
                 sipp_employee_rate * salary * 1.25
             )  # Tax relief on SIPP contributions
 
-        # Calculate total contribution rate from salary
+        # --------- Total contribution progress ---------
+        # When using qualifying earnings, the effective contribution rate of
+        # workplace employee contributions is scaled down to reflect only the
+        # portion of salary above the qualifying lower band. Otherwise use the
+        # nominal rate directly.
         if use_qualifying:
             real_workplace_employee_rate = (
                 workplace_employee_rate * qualifying_earnings / salary
@@ -253,16 +429,60 @@ def sidebar_inputs() -> (
             text=f"Total: {total_contrib_rate:.0%} of salary",
         )
 
+    # Return all calculated values for further processing in the sidebar
+    return (
+        lisa_rate,
+        isa_rate,
+        sipp_employee_rate,
+        sipp_employer_rate,
+        workplace_employee_rate,
+        workplace_employer_rate,
+        unused_allowance,
+        unused_salary,
+        total_lisa,
+        total_contrib_rate,
+    )
+
+
+def post50_lisa_section(
+    total_lisa: float, unused_allowance: float
+) -> Tuple[float, float]:
+    """Collect post‑50 redirection preferences for LISA contributions.
+
+    Lifetime ISA contributions are only allowed until the age of 50. When the user
+    reaches this age, they may choose to divert those contributions into their
+    ISA or SIPP. This function captures that preference.
+
+    Parameters
+    ----------
+    total_lisa : float
+        The total LISA contribution in pounds (salary × lisa_rate).
+    unused_allowance : float
+        Remaining pension annual allowance after contributions, used to
+        determine if the user must redirect their entire LISA contribution to
+        the ISA.
+
+    Returns
+    -------
+    Tuple[float, float]
+        A tuple containing (shift_lisa_to_isa, shift_lisa_to_sipp), where
+        shift_lisa_to_isa is the fraction of the LISA contribution redirected
+        to an ISA once the user turns 50, and shift_lisa_to_sipp is the
+        remainder redirected to a SIPP.
+    """
     with st.sidebar.expander("Post-50 LISA redirection", expanded=False):
-        total_lisa = lisa_rate * salary
+        # Determine the minimum portion of LISA that must be directed to ISA to
+        # avoid exceeding the pension annual allowance
         if unused_allowance < total_lisa:
             minimum_directable_lisa = (total_lisa - unused_allowance) / total_lisa
         else:
             minimum_directable_lisa = 0.0
         st.markdown(
-            "*When you reach 50, you can no longer contribute to a LISA. Specify how to redirect those contributions:*"
+            "*When you reach 50, you can no longer contribute to a LISA. "
+            "Specify how to redirect those contributions:*"
         )
         if minimum_directable_lisa == 1.0:
+            # User must redirect the entire LISA contribution to ISA
             st.warning(
                 "⚠️ You must redirect 100% of LISA contributions to ISA, maximum pension contribution is capped by the annual allowance."
             )
@@ -278,7 +498,18 @@ def sidebar_inputs() -> (
             )
         shift_lisa_to_sipp = 1.0 - shift_lisa_to_isa
         st.write(f"% redirected to SIPP: {shift_lisa_to_sipp:.0%}")
+    return shift_lisa_to_isa, shift_lisa_to_sipp
 
+
+def returns_section() -> Tuple[float, float, float, float, float]:
+    """Collect expected annual return rates and inflation.
+
+    Returns
+    -------
+    Tuple[float, float, float, float, float]
+        A tuple containing ROI for LISA, ISA, SIPP, workplace pension and
+        inflation (all nominal).
+    """
     with st.sidebar.expander("Expected annual returns (nominal)", expanded=False):
         roi_lisa = st.slider("LISA ROI", 0.00, 0.15, 0.05, step=0.01, key="roi_lisa")
         roi_isa = st.slider("ISA ROI", 0.00, 0.15, 0.05, step=0.01, key="roi_isa")
@@ -289,7 +520,77 @@ def sidebar_inputs() -> (
         inflation = st.slider(
             "Inflation", 0.00, 0.10, 0.02, step=0.005, key="inflation"
         )
+    return roi_lisa, roi_isa, roi_sipp, roi_workplace, inflation
 
+
+def sidebar_inputs() -> (
+    Tuple[
+        "pw.core.UserProfile",
+        "pw.core.ContributionRates",
+        "pw.core.InvestmentReturns",
+        "pw.core.IncomeBreakdown",
+        float,
+        bool,
+        int,
+        int,
+        int,
+    ]
+):
+    """Gather all user inputs from the sidebar.
+
+    This orchestrates calls to the helper functions defined above. It
+    constructs the planwise UserProfile, ContributionRates and InvestmentReturns
+    objects, and returns them along with inflation and other values needed for
+    downstream projections.
+    """
+    # Step 1: tax year selection
+    tax_year = select_tax_year()
+    # Step 2: tax settings
+    (
+        scotland,
+        use_qualifying,
+        qualifying_earnings,
+        qualifying_upper,
+        qualifying_lower,
+    ) = tax_settings_section(tax_year)
+    # Step 3: personal details
+    (
+        current_age,
+        retirement_age,
+        salary,
+        take_home_salary,
+        ni_due,
+        income_tax,
+    ) = personal_details_section(scotland)
+    # Step 4: contribution rates
+    (
+        lisa_rate,
+        isa_rate,
+        sipp_employee_rate,
+        sipp_employer_rate,
+        workplace_employee_rate,
+        workplace_employer_rate,
+        unused_allowance,
+        unused_salary,
+        total_lisa,
+        _total_contrib_rate,
+    ) = contribution_rates_section(
+        tax_year,
+        take_home_salary,
+        use_qualifying,
+        qualifying_earnings,
+        qualifying_upper,
+        qualifying_lower,
+        scotland,
+    )
+    # Step 5: post‑50 LISA redirection
+    shift_lisa_to_isa, shift_lisa_to_sipp = post50_lisa_section(
+        total_lisa, unused_allowance
+    )
+    # Step 6: expected returns & inflation
+    roi_lisa, roi_isa, roi_sipp, roi_workplace, inflation = returns_section()
+
+    # Construct planwise objects based on the collected values
     user = pw.core.UserProfile(
         current_age=current_age,
         retirement_age=retirement_age,
@@ -312,11 +613,18 @@ def sidebar_inputs() -> (
         sipp=roi_sipp,
         workplace=roi_workplace,
     )
+    income = pw.core.IncomeBreakdown(
+        salary=salary,
+        take_home_salary=take_home_salary,
+        ni_due=ni_due,
+        income_tax=income_tax,
+    )
 
     return (
         user,
         contrib,
         returns,
+        income,
         inflation,
         use_qualifying,
         tax_year,
@@ -326,6 +634,24 @@ def sidebar_inputs() -> (
 
 
 def show_summary_metrics(df: pd.DataFrame) -> Tuple[pd.Series, float]:
+    """Display high‑level summary metrics in the main area.
+
+    Given the projection dataframe produced by planwise, this function
+    calculates the final value of each pot, total contributions made and
+    displays these as Streamlit metrics. It returns the final row of the
+    dataframe (containing end balances) and the aggregate final value for
+    further use.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The retirement projection dataframe returned by planwise.
+
+    Returns
+    -------
+    Tuple[pd.Series, float]
+        The final row of the dataframe and the total final pot value.
+    """
     final_row = df.iloc[-1]
     total_final = (
         final_row["Pot LISA"]
@@ -335,7 +661,7 @@ def show_summary_metrics(df: pd.DataFrame) -> Tuple[pd.Series, float]:
     )
     total_contributions = df["Net Contribution Cost"].sum()
 
-    # Display key metrics
+    # Display key metrics in four columns
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total Final Value", f"£{total_final:,.0f}")
@@ -352,6 +678,15 @@ def show_summary_metrics(df: pd.DataFrame) -> Tuple[pd.Series, float]:
 
 
 def show_final_breakdown(final_row: pd.Series, total_final: float) -> None:
+    """Show a detailed breakdown of final pot values and percentages.
+
+    Parameters
+    ----------
+    final_row : pd.Series
+        The last row of the projection dataframe containing pot balances.
+    total_final : float
+        The sum of all pots at the end of the projection period.
+    """
     st.subheader("Final Pot Breakdown")
     breakdown_col1, breakdown_col2 = st.columns(2)
 
@@ -363,7 +698,8 @@ def show_final_breakdown(final_row: pd.Series, total_final: float) -> None:
         st.write(f"🏢 Workplace: £{final_row['Pot Workplace']:,.0f}")
 
     with breakdown_col2:
-        # Calculate percentages
+        # Calculate percentages relative to the total final value. Guard against
+        # division by zero if total_final is zero (though this scenario is unlikely).
         lisa_pct = final_row["Pot LISA"] / total_final * 100 if total_final > 0 else 0
         isa_pct = final_row["Pot ISA"] / total_final * 100 if total_final > 0 else 0
         sipp_pct = final_row["Pot SIPP"] / total_final * 100 if total_final > 0 else 0
@@ -379,6 +715,17 @@ def show_final_breakdown(final_row: pd.Series, total_final: float) -> None:
 
 
 def show_data_table(df: pd.DataFrame) -> None:
+    """Display the projection dataframe in an expandable table.
+
+    Each monetary column is formatted with pound signs and commas for readability.
+    The table is placed inside an expander to avoid overwhelming the user
+    interface unless they wish to explore the year‑by‑year details.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Projection results from planwise.
+    """
     st.subheader("Year-by-year projection")
     with st.expander("Show detailed data table"):
         st.dataframe(
@@ -408,6 +755,18 @@ def show_data_table(df: pd.DataFrame) -> None:
 
 
 def show_visualizations(df: pd.DataFrame) -> None:
+    """Render contribution and growth charts.
+
+    If the optional 'altair' dependency is available (as part of
+    planwise[plotting]), this function uses planwise helper functions to create
+    Altair charts for annual contributions and pot growth over time. Otherwise,
+    it displays a warning instructing the user how to enable charting.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Projection results from planwise.
+    """
     st.subheader("Visualizations")
 
     try:
@@ -433,6 +792,17 @@ def show_visualizations(df: pd.DataFrame) -> None:
 
 
 def show_download(df: pd.DataFrame, current_age: int, retirement_age: int) -> None:
+    """Offer a download button for the projection data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Projection results to be exported.
+    current_age : int
+        User's current age used in the filename.
+    retirement_age : int
+        User's retirement age used in the filename.
+    """
     st.subheader("Export Data")
     csv = df.to_csv(index=False)
     st.download_button(
@@ -444,6 +814,7 @@ def show_download(df: pd.DataFrame, current_age: int, retirement_age: int) -> No
 
 
 def show_sidebar_footer() -> None:
+    """Display informational text at the bottom of the sidebar."""
     st.sidebar.markdown("---")
     st.sidebar.markdown("### ℹ️ About")
     st.sidebar.markdown(
@@ -459,7 +830,13 @@ def show_sidebar_footer() -> None:
 
 
 def main() -> None:
-    """Main Streamlit application."""
+    """Entry point for the Streamlit app.
+
+    This function sets up the page configuration, renders the introductory
+    explanatory text, collects user inputs via the sidebar and then runs the
+    retirement projection. Results are displayed using helper functions. Any
+    errors during projection are caught and displayed to the user.
+    """
     st.set_page_config(page_title="UK Retirement & Investment Planner", layout="wide")
     st.title("UK Investment & Retirement Planning Model")
 
@@ -479,6 +856,7 @@ def main() -> None:
         user,
         contrib,
         returns,
+        income,
         inflation,
         use_qualifying,
         tax_year,

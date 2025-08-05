@@ -7,6 +7,7 @@ Pension (SIPP) and workplace pensions.
 """
 
 from .core import project_retirement
+from .ni import NICBand, calculate_ni
 from .plotting import make_contribution_plot, make_growth_plot
 from .tax import TaxBand, calculate_income_tax, get_tax_bands
 
