@@ -364,6 +364,9 @@ def project_retirement(
             {
                 "Age": age,
                 "Salary": current_salary,
+                "Take-home Salary": income.take_home_salary,
+                "Income Tax": income.income_tax,
+                "NI Contribution": income.ni_due,
                 "LISA Net": lisa_net,
                 "LISA Bonus": lisa_bonus,
                 "ISA Net": isa_net,
