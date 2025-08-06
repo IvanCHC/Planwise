@@ -238,6 +238,7 @@ def project_retirement(
     pot_sipp = 0.0
     pot_workplace = 0.0
     current_salary = user.salary
+    take_home_salary = income.take_home_salary
 
     # Initialize accumulators for net and gross contributions
     acc_lisa_net = 0.0
@@ -255,16 +256,16 @@ def project_retirement(
         # Determine the contribution base for workplace pension
         if use_qualifying_earnings:
             qualifying_salary = min(
-                max(current_salary - qualifying_lower, 0),
+                max(take_home_salary - qualifying_lower, 0),
                 qualifying_upper - qualifying_lower,
             )
             base_for_workplace = qualifying_salary
         else:
-            base_for_workplace = current_salary
+            base_for_workplace = take_home_salary
 
         # Calculate LISA/ISA contributions and redirections
         lisa_isa = calculate_lisa_isa_contributions(
-            current_salary=current_salary,
+            current_salary=take_home_salary,
             age=age,
             contrib=contrib,
             lisa_limit=lisa_limit,
@@ -278,7 +279,7 @@ def project_retirement(
 
         # Calculate SIPP and workplace pension contributions
         pensions = calculate_pension_contributions(
-            current_salary=current_salary,
+            current_salary=take_home_salary,
             base_for_workplace=base_for_workplace,
             contrib=contrib,
             redirected_sipp_net=redirected_sipp_net,
@@ -378,6 +379,7 @@ def project_retirement(
                 "Workplace Employer": wp_employer_gross,
                 "Tax Relief (total)": tax_relief_total,
                 "Tax Refund": tax_refund,
+                "Total Contribution Cost": net_contrib_total,
                 "Net Contribution Cost": net_cost_after_refund,
                 "Pot LISA": pot_lisa,
                 "Pot ISA": pot_isa,
