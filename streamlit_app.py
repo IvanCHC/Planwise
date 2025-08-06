@@ -78,7 +78,7 @@ def personal_details_section(
     Tuple[int, int, float, float]
         A tuple containing the current age, retirement age, annual salary, and take-home salary.
     """
-    with st.sidebar.expander("Personal Details", expanded=True):
+    with st.sidebar.expander("Personal Details", expanded=False):
         current_age: int = st.number_input(
             "Current age",
             min_value=18,
@@ -192,7 +192,6 @@ def contribution_rates_section(
     qualifying_earnings: float,
     qualifying_upper: float,
     qualifying_lower: float,
-    scotland: bool,
 ) -> Tuple[float, float, float, float, float, float, float, float, float, float,]:
     """Collect contribution rates for each tax wrapper.
 
@@ -234,7 +233,7 @@ def contribution_rates_section(
           bar in the sidebar.
     """
     with st.sidebar.expander(
-        "Contribution rates (as % of take home salary)", expanded=True
+        "Contribution rates (as % of take home salary)", expanded=False
     ):
         # --------- LISA contributions ---------
         lisa_limit = pw.core.LIMITS_DB[str(tax_year)]["lisa_limit"]
@@ -426,7 +425,7 @@ def contribution_rates_section(
         )
         st.progress(
             min(total_contrib_rate, 1.0),
-            text=f"Total: {total_contrib_rate:.0%} of salary",
+            text=f"Total: {total_contrib_rate:.0%} of salary (£{salary:,.0f})",
         )
 
     # Return all calculated values for further processing in the sidebar
@@ -581,7 +580,6 @@ def sidebar_inputs() -> (
         qualifying_earnings,
         qualifying_upper,
         qualifying_lower,
-        scotland,
     )
     # Step 5: post‑50 LISA redirection
     shift_lisa_to_isa, shift_lisa_to_sipp = post50_lisa_section(
