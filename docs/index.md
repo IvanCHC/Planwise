@@ -53,9 +53,9 @@ print(results.head())
 Main function for projecting retirement savings across multiple tax wrappers.
 
 **Parameters:**
-- `user` (`UserProfile`): User profile including age, retirement age, salary, and region.
-- `contrib` (`ContributionRates`): Contribution rates for each wrapper and shift rates after age 50.
-- `returns` (`InvestmentReturns`): Expected annual rates of return for each wrapper.
+- `user` ([`planwise.core.UserProfile`](src/planwise/core.py)): User profile including age, retirement age, salary, and region.
+- `contrib` ([`planwise.core.ContributionRates`](src/planwise/core.py)): Contribution rates for each wrapper and shift rates after age 50.
+- `returns` ([`planwise.core.InvestmentReturns`](src/planwise/core.py)): Expected annual rates of return for each wrapper.
 - `inflation` (float): Annual inflation rate (0-1)
 - `use_qualifying_earnings` (bool): Use qualifying earnings for workplace pension
 - `year` (int): Tax year (e.g., 2025 for 2025/26)
@@ -91,6 +91,14 @@ Dataclass for investment returns:
 - `sipp` (float)
 - `workplace` (float)
 
+#### `IncomeBreakdown`
+
+Dataclass for income breakdown:
+- `salary` (float)
+- `take_home_salary` (float)
+- `income_tax` (float)
+- `ni_due` (float)
+
 ### Tax Functions
 
 #### `calculate_income_tax(income, scotland, year)`
@@ -114,7 +122,32 @@ Get tax bands and personal allowance for a region and tax year.
 - `year` (int): Tax year (e.g., 2025 for 2025/26)
 
 **Returns:**
-- `Tuple[List[TaxBand], float]`: List of TaxBand objects and personal allowance for the given year
+- `Tuple[List[TaxBand], float]`: List of [`planwise.tax.TaxBand`](src/planwise/tax.py) objects and personal allowance for the given year
+
+### National Insurance Functions
+
+#### `calculate_ni(income, year=2025, category="category_a")`
+
+Calculate National Insurance contributions for a given income, year, and category.
+
+**Parameters:**
+- `income` (float): Gross annual income
+- `year` (int): Tax year (default 2025)
+- `category` (str): NI category (default "category_a")
+
+**Returns:**
+- `float`: National Insurance contribution due
+
+#### `get_ni_bands(year=2025, category="category_a")`
+
+Get NI bands for a given year and category.
+
+**Parameters:**
+- `year` (int): Tax year
+- `category` (str): NI category
+
+**Returns:**
+- `List[NICBand]`: List of [`planwise.ni.NICBand`](src/planwise/ni.py) objects
 
 ### Plotting Functions
 
@@ -125,6 +158,10 @@ Create contribution breakdown chart.
 #### `make_growth_plot(df, title=None)`
 
 Create pot growth chart.
+
+#### `make_combined_plot(df)`
+
+Create combined contributions and growth chart.
 
 ## Examples
 
