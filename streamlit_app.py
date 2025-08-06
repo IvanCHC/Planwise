@@ -28,6 +28,7 @@ contributions.
 from typing import Any, Tuple
 
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 # Import from our library
@@ -897,8 +898,8 @@ def main() -> None:
         )
 
         final_row, total_final = show_summary_metrics(df)
-        # --- New: Show salary and contribution breakdown (using first row) ---
-        show_salary_and_contribution_breakdown(df.iloc[0])
+        # --- New: Show salary and contribution breakdown (using input income) ---
+        show_salary_and_contribution_breakdown(income, df.iloc[0])
         show_final_breakdown(final_row, total_final)
         show_data_table(df)
         show_visualizations(df)
@@ -912,16 +913,18 @@ def main() -> None:
 
 
 # --- New: Salary and Contribution Breakdown Section ---
-def show_salary_and_contribution_breakdown(first_row: pd.Series) -> None:
-    """Display a breakdown of salary and contributions for the first year."""
+def show_salary_and_contribution_breakdown(
+    income: pw.IncomeBreakdown, first_row: pd.Series
+) -> None:
+    """Display a breakdown of salary and contributions for the first year, using the input income object for salary/tax."""
     st.subheader("First Year: Salary & Contribution Breakdown")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.write("**Salary & Take-home:**")
-        st.write(f"Gross Salary: £{first_row.get('Salary', 0):,.0f}")
-        st.write(f"Take-home: £{first_row.get('Take-home Salary', 0):,.0f}")
-        st.write(f"Income Tax: £{first_row.get('Income Tax', 0):,.0f}")
-        st.write(f"NI Contribution: £{first_row.get('NI Contribution', 0):,.0f}")
+        st.write(f"Gross Salary: £{getattr(income, 'salary', 0):,.0f}")
+        st.write(f"Take-home: £{getattr(income, 'take_home_salary', 0):,.0f}")
+        st.write(f"Income Tax: £{getattr(income, 'income_tax', 0):,.0f}")
+        st.write(f"NI Contribution: £{getattr(income, 'ni_due', 0):,.0f}")
     with col2:
         st.write("**Net Contributions:**")
         st.write(f"LISA: £{first_row.get('LISA Net', 0):,.0f}")
@@ -940,8 +943,14 @@ def show_salary_and_contribution_breakdown(first_row: pd.Series) -> None:
         st.write(f"Tax Relief (total): £{first_row.get('Tax Relief (total)', 0):,.0f}")
         st.write(f"Tax Refund: £{first_row.get('Tax Refund', 0):,.0f}")
         st.write(
+            f"Total Contributions: £{first_row.get('Total Contribution Cost', 0):,.0f}"
+        )
+        st.write(
             f"Net Contribution Cost: £{first_row.get('Net Contribution Cost', 0):,.0f}"
         )
+    with col4:
+        fig = pw.make_income_breakdown_pie(income)
+        st.plotly_chart(fig, use_container_width=True)
 
 
 if __name__ == "__main__":
