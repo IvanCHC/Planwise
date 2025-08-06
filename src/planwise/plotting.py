@@ -9,6 +9,10 @@ from typing import Optional
 
 import altair as alt
 import pandas as pd
+import plotly
+import plotly.express as px
+
+from .core import IncomeBreakdown
 
 
 def make_contribution_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart:
@@ -104,3 +108,35 @@ def make_combined_plot(df: pd.DataFrame) -> alt.Chart:
     )
 
     return combined
+
+
+def make_income_breakdown_pie(
+    income: IncomeBreakdown,
+) -> "plotly.graph_objs._figure.Figure":
+    """
+    Create a pie chart for the income breakdown (Take-home, Income Tax, NI Contribution).
+
+    Args:
+        income: An object with attributes salary, take_home_salary, income_tax, ni_due.
+    Returns:
+        plotly Figure object.
+    """
+    import pandas as pd
+
+    take_home = getattr(income, "take_home_salary", 0)
+    income_tax = getattr(income, "income_tax", 0)
+    ni_due = getattr(income, "ni_due", 0)
+    pie_data = pd.DataFrame(
+        {
+            "Component": ["Take-home", "Income Tax", "NI Contribution"],
+            "Amount": [take_home, income_tax, ni_due],
+        }
+    )
+    fig = px.pie(
+        pie_data,
+        names="Component",
+        values="Amount",
+        title="Income Breakdown",
+        color_discrete_sequence=px.colors.sequential.Blues,
+    )
+    return fig
