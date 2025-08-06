@@ -264,12 +264,21 @@ def main() -> None:
         workplace=args.roi_workplace,
     )
 
-    # Run the retirement projection
+    # Prepare a dummy IncomeBreakdown (not used in CLI projections)
+    from .core import IncomeBreakdown
+
+    income = IncomeBreakdown(
+        salary=args.salary,
+        take_home_salary=args.salary,  # Placeholder
+        income_tax=0.0,  # Placeholder
+        ni_due=0.0,  # Placeholder
+    )
     try:
         df = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=args.inflation,
             use_qualifying_earnings=args.use_qualifying_earnings,
             year=args.tax_year,

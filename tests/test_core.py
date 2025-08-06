@@ -50,10 +50,19 @@ class TestProjectRetirement:
             sipp=0.05,
             workplace=0.05,
         )
+        from planwise.core import IncomeBreakdown
+
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
         result = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=0.02,
             use_qualifying_earnings=True,
             year=2025,
@@ -114,10 +123,19 @@ class TestProjectRetirement:
             sipp=0.0,
             workplace=0.0,
         )
+        from planwise.core import IncomeBreakdown
+
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
         result = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=0.0,
             use_qualifying_earnings=True,
             year=2025,
@@ -161,10 +179,19 @@ class TestProjectRetirement:
             sipp=0.0,
             workplace=0.0,
         )
+        from planwise.core import IncomeBreakdown
+
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
         result = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=0.0,
             use_qualifying_earnings=True,
             year=2025,
@@ -244,10 +271,19 @@ class TestProjectRetirement:
             sipp=0.10,
             workplace=0.10,
         )
+        from planwise.core import IncomeBreakdown
+
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
         result = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=0.0,
             use_qualifying_earnings=True,
             year=2025,
@@ -285,10 +321,19 @@ class TestProjectRetirement:
             sipp=0.0,
             workplace=0.0,
         )
+        from planwise.core import IncomeBreakdown
+
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
         result_low = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=0.0,
             use_qualifying_earnings=True,
             year=2025,
@@ -330,10 +375,19 @@ class TestProjectRetirement:
             sipp=0.0,
             workplace=0.0,
         )
+        from planwise.core import IncomeBreakdown
+
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
         result = project_retirement(
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=0.0,
             use_qualifying_earnings=True,
             year=2025,

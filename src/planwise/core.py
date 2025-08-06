@@ -201,6 +201,7 @@ def project_retirement(
     user: UserProfile,
     contrib: ContributionRates,
     returns: InvestmentReturns,
+    income: IncomeBreakdown,
     inflation: float,
     use_qualifying_earnings: bool,
     year: int,

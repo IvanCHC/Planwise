@@ -890,12 +890,15 @@ def main() -> None:
             user=user,
             contrib=contrib,
             returns=returns,
+            income=income,
             inflation=inflation,
             use_qualifying_earnings=use_qualifying,
             year=tax_year,
         )
 
         final_row, total_final = show_summary_metrics(df)
+        # --- New: Show salary and contribution breakdown (using first row) ---
+        show_salary_and_contribution_breakdown(df.iloc[0])
         show_final_breakdown(final_row, total_final)
         show_data_table(df)
         show_visualizations(df)
@@ -906,6 +909,39 @@ def main() -> None:
         st.error("Please check your input parameters and try again.")
 
     show_sidebar_footer()
+
+
+# --- New: Salary and Contribution Breakdown Section ---
+def show_salary_and_contribution_breakdown(first_row: pd.Series) -> None:
+    """Display a breakdown of salary and contributions for the first year."""
+    st.subheader("First Year: Salary & Contribution Breakdown")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.write("**Salary & Take-home:**")
+        st.write(f"Gross Salary: £{first_row.get('Salary', 0):,.0f}")
+        st.write(f"Take-home: £{first_row.get('Take-home Salary', 0):,.0f}")
+        st.write(f"Income Tax: £{first_row.get('Income Tax', 0):,.0f}")
+        st.write(f"NI Contribution: £{first_row.get('NI Contribution', 0):,.0f}")
+    with col2:
+        st.write("**Net Contributions:**")
+        st.write(f"LISA: £{first_row.get('LISA Net', 0):,.0f}")
+        st.write(f"ISA: £{first_row.get('ISA Net', 0):,.0f}")
+        st.write(f"SIPP (Employee): £{first_row.get('SIPP Employee Net', 0):,.0f}")
+        st.write(f"SIPP (Employer): £{first_row.get('SIPP Employer', 0):,.0f}")
+        st.write(
+            f"Workplace (Employee): £{first_row.get('Workplace Employee Net', 0):,.0f}"
+        )
+        st.write(
+            f"Workplace (Employer): £{first_row.get('Workplace Employer', 0):,.0f}"
+        )
+    with col3:
+        st.write("**Other Details:**")
+        st.write(f"LISA Bonus: £{first_row.get('LISA Bonus', 0):,.0f}")
+        st.write(f"Tax Relief (total): £{first_row.get('Tax Relief (total)', 0):,.0f}")
+        st.write(f"Tax Refund: £{first_row.get('Tax Refund', 0):,.0f}")
+        st.write(
+            f"Net Contribution Cost: £{first_row.get('Net Contribution Cost', 0):,.0f}"
+        )
 
 
 if __name__ == "__main__":
