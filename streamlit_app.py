@@ -686,7 +686,7 @@ def show_final_breakdown(final_row: pd.Series, total_final: float) -> None:
         The sum of all pots at the end of the projection period.
     """
     st.subheader("Final Pot Breakdown")
-    breakdown_col1, breakdown_col2 = st.columns(2)
+    breakdown_col1, breakdown_col2, breakdown_col3, breakdown_col4 = st.columns(4)
 
     with breakdown_col1:
         st.write("**Final Values:**")
@@ -710,6 +710,20 @@ def show_final_breakdown(final_row: pd.Series, total_final: float) -> None:
         st.write(f"💳 ISA: {isa_pct:.1f}%")
         st.write(f"🏦 SIPP: {sipp_pct:.1f}%")
         st.write(f"🏢 Workplace: {workplace_pct:.1f}%")
+
+    with breakdown_col3:
+        st.write("**Total Gross Contribution:**")
+        st.write(f"💰 LISA: £{final_row['Accumulated LISA Gross']:,.0f}")
+        st.write(f"💳 ISA: £{final_row['Accumulated ISA Gross']:,.0f}")
+        st.write(f"🏦 SIPP: £{final_row['Accumulated SIPP Gross']:,.0f}")
+        st.write(f"🏢 Workplace: £{final_row['Accumulated Workplace Gross']:,.0f}")
+
+    with breakdown_col4:
+        st.write("**Total Net Contribution:**")
+        st.write(f"💰 LISA: £{final_row['Accumulated LISA Net']:,.0f}")
+        st.write(f"💳 ISA: £{final_row['Accumulated ISA Net']:,.0f}")
+        st.write(f"🏦 SIPP: £{final_row['Accumulated SIPP Net']:,.0f}")
+        st.write(f"🏢 Workplace: £{final_row['Accumulated Workplace Net']:,.0f}")
 
 
 def show_data_table(df: pd.DataFrame) -> None:
@@ -746,6 +760,15 @@ def show_data_table(df: pd.DataFrame) -> None:
                     "Pot ISA": "£{:,.0f}",
                     "Pot SIPP": "£{:,.0f}",
                     "Pot Workplace": "£{:,.0f}",
+                    # New accumulated columns
+                    "Accumulated LISA Net": "£{:,.0f}",
+                    "Accumulated LISA Gross": "£{:,.0f}",
+                    "Accumulated ISA Net": "£{:,.0f}",
+                    "Accumulated ISA Gross": "£{:,.0f}",
+                    "Accumulated SIPP Net": "£{:,.0f}",
+                    "Accumulated SIPP Gross": "£{:,.0f}",
+                    "Accumulated Workplace Net": "£{:,.0f}",
+                    "Accumulated Workplace Gross": "£{:,.0f}",
                 }
             ),
             use_container_width=True,

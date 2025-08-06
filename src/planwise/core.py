@@ -238,6 +238,16 @@ def project_retirement(
     pot_workplace = 0.0
     current_salary = user.salary
 
+    # Initialize accumulators for net and gross contributions
+    acc_lisa_net = 0.0
+    acc_lisa_gross = 0.0
+    acc_isa_net = 0.0
+    acc_isa_gross = 0.0
+    acc_sipp_net = 0.0
+    acc_sipp_gross = 0.0
+    acc_workplace_net = 0.0
+    acc_workplace_gross = 0.0
+
     for year_index in range(years):
         age = user.current_age + year_index
 
@@ -326,6 +336,16 @@ def project_retirement(
         net_contrib_total = sipp_employee_net + wp_employee_net + lisa_net + isa_net
         net_cost_after_refund = net_contrib_total - tax_refund
 
+        # Update accumulated net and gross contributions
+        acc_lisa_net += lisa_net
+        acc_lisa_gross += lisa_gross
+        acc_isa_net += isa_net
+        acc_isa_gross += isa_net  # ISA gross = net (no bonus)
+        acc_sipp_net += sipp_employee_net
+        acc_sipp_gross += sipp_employee_gross + sipp_employer_gross
+        acc_workplace_net += wp_employee_net
+        acc_workplace_gross += wp_employee_gross + wp_employer_gross
+
         # Update pots by adding gross contributions and applying growth
         pot_lisa = pot_lisa * (1 + returns.lisa) + lisa_gross
         pot_isa = pot_isa * (1 + returns.isa) + isa_net
@@ -359,6 +379,15 @@ def project_retirement(
                 "Pot ISA": pot_isa,
                 "Pot SIPP": pot_sipp,
                 "Pot Workplace": pot_workplace,
+                # New columns for accumulated contributions
+                "Accumulated LISA Net": acc_lisa_net,
+                "Accumulated LISA Gross": acc_lisa_gross,
+                "Accumulated ISA Net": acc_isa_net,
+                "Accumulated ISA Gross": acc_isa_gross,
+                "Accumulated SIPP Net": acc_sipp_net,
+                "Accumulated SIPP Gross": acc_sipp_gross,
+                "Accumulated Workplace Net": acc_workplace_net,
+                "Accumulated Workplace Gross": acc_workplace_gross,
             }
         )
 
