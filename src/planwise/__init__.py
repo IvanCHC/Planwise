@@ -6,9 +6,13 @@ including Lifetime ISA (LISA), Stocks & Shares ISA, Self-Invested Personal
 Pension (SIPP) and workplace pensions.
 """
 
-from .core import project_retirement
+from .core import IncomeBreakdown, project_retirement
 from .ni import NICBand, calculate_ni
-from .plotting import make_contribution_plot, make_growth_plot
+from .plotting import (
+    make_contribution_plot,
+    make_growth_plot,
+    make_income_breakdown_pie,
+)
 from .tax import TaxBand, calculate_income_tax, get_tax_bands
 
 __version__ = "0.1.0"
