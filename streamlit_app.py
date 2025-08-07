@@ -761,7 +761,6 @@ def show_data_table(df: pd.DataFrame) -> None:
                     "Pot ISA": "£{:,.0f}",
                     "Pot SIPP": "£{:,.0f}",
                     "Pot Workplace": "£{:,.0f}",
-                    # New accumulated columns
                     "Accumulated LISA Net": "£{:,.0f}",
                     "Accumulated LISA Gross": "£{:,.0f}",
                     "Accumulated ISA Net": "£{:,.0f}",
@@ -770,6 +769,10 @@ def show_data_table(df: pd.DataFrame) -> None:
                     "Accumulated SIPP Gross": "£{:,.0f}",
                     "Accumulated Workplace Net": "£{:,.0f}",
                     "Accumulated Workplace Gross": "£{:,.0f}",
+                    "Pot LISA (Inflation Adjusted)": "£{:,.0f}",
+                    "Pot ISA (Inflation Adjusted)": "£{:,.0f}",
+                    "Pot SIPP (Inflation Adjusted)": "£{:,.0f}",
+                    "Pot Workplace (Inflation Adjusted)": "£{:,.0f}",
                 }
             ),
             use_container_width=True,
@@ -897,8 +900,18 @@ def main() -> None:
             year=tax_year,
         )
 
+        # --- Add inflation-adjusted (real) pot values ---
+        inflation_rate_col = pd.Series([inflation] * len(df))
+        # Compute cumulative inflation factor for each year
+        cumulative_inflation = (1 + inflation_rate_col).cumprod()
+        # Set first year to 1.0 (no adjustment)
+        cumulative_inflation.iloc[0] = 1.0
+        # Add real (inflation-adjusted) columns for each pot
+        for pot in ["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"]:
+            if pot in df.columns:
+                df[f"{pot} (Inflation Adjusted)"] = df[pot] / cumulative_inflation
+
         final_row, total_final = show_summary_metrics(df)
-        # --- New: Show salary and contribution breakdown (using input income) ---
         show_salary_and_contribution_breakdown(income, df)
         show_final_breakdown(final_row, total_final)
         show_data_table(df)
