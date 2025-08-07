@@ -899,7 +899,7 @@ def main() -> None:
 
         final_row, total_final = show_summary_metrics(df)
         # --- New: Show salary and contribution breakdown (using input income) ---
-        show_salary_and_contribution_breakdown(income, df.iloc[0])
+        show_salary_and_contribution_breakdown(income, df)
         show_final_breakdown(final_row, total_final)
         show_data_table(df)
         show_visualizations(df)
@@ -912,12 +912,30 @@ def main() -> None:
     show_sidebar_footer()
 
 
-# --- New: Salary and Contribution Breakdown Section ---
 def show_salary_and_contribution_breakdown(
-    income: pw.IncomeBreakdown, first_row: pd.Series
+    income: pw.IncomeBreakdown, df: pd.DataFrame
 ) -> None:
-    """Display a breakdown of salary and contributions for the first year, using the input income object for salary/tax."""
+    """Display a breakdown of salary and contributions for the first year or post-50, using the input income object for salary/tax."""
     st.subheader("Salary & Contribution Breakdown")
+    option = st.selectbox(
+        "Select breakdown year:",
+        ("Pre-50 Breakdown", "Post-50 Breakdown"),
+        key="breakdown_year_selectbox",
+    )
+
+    if option == "Pre-50 Breakdown":
+        row = df.iloc[0]
+    else:
+        # Find the first row where Age >= 50, fallback to last row if not found
+        if "Age" in df.columns:
+            post50_rows = df[df["Age"] >= 50]
+            if not post50_rows.empty:
+                row = post50_rows.iloc[0]
+            else:
+                row = df.iloc[-1]
+        else:
+            row = df.iloc[-1]
+
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.write("**Salary & Take-home:**")
@@ -926,31 +944,23 @@ def show_salary_and_contribution_breakdown(
         st.write(f"Income Tax: £{getattr(income, 'income_tax', 0):,.0f}")
         st.write(f"NI Contribution: £{getattr(income, 'ni_due', 0):,.0f}")
         st.write(
-            f"Take-home (after contributions): £{getattr(income, 'take_home_salary', 0)-first_row.get('Net Contribution Cost', 0):,.0f}"
+            f"Take-home (after contributions): £{getattr(income, 'take_home_salary', 0)-row.get('Net Contribution Cost', 0):,.0f}"
         )
     with col2:
         st.write("**Net Contributions:**")
-        st.write(f"LISA: £{first_row.get('LISA Net', 0):,.0f}")
-        st.write(f"ISA: £{first_row.get('ISA Net', 0):,.0f}")
-        st.write(f"SIPP (Employee): £{first_row.get('SIPP Employee Net', 0):,.0f}")
-        st.write(f"SIPP (Employer): £{first_row.get('SIPP Employer', 0):,.0f}")
-        st.write(
-            f"Workplace (Employee): £{first_row.get('Workplace Employee Net', 0):,.0f}"
-        )
-        st.write(
-            f"Workplace (Employer): £{first_row.get('Workplace Employer', 0):,.0f}"
-        )
+        st.write(f"LISA: £{row.get('LISA Net', 0):,.0f}")
+        st.write(f"ISA: £{row.get('ISA Net', 0):,.0f}")
+        st.write(f"SIPP (Employee): £{row.get('SIPP Employee Net', 0):,.0f}")
+        st.write(f"SIPP (Employer): £{row.get('SIPP Employer', 0):,.0f}")
+        st.write(f"Workplace (Employee): £{row.get('Workplace Employee Net', 0):,.0f}")
+        st.write(f"Workplace (Employer): £{row.get('Workplace Employer', 0):,.0f}")
     with col3:
         st.write("**Other Details:**")
-        st.write(f"LISA Bonus: £{first_row.get('LISA Bonus', 0):,.0f}")
-        st.write(f"Tax Relief (total): £{first_row.get('Tax Relief (total)', 0):,.0f}")
-        st.write(f"Tax Refund: £{first_row.get('Tax Refund', 0):,.0f}")
-        st.write(
-            f"Total Contributions: £{first_row.get('Total Contribution Cost', 0):,.0f}"
-        )
-        st.write(
-            f"Net Contribution Cost: £{first_row.get('Net Contribution Cost', 0):,.0f}"
-        )
+        st.write(f"LISA Bonus: £{row.get('LISA Bonus', 0):,.0f}")
+        st.write(f"Tax Relief (total): £{row.get('Tax Relief (total)', 0):,.0f}")
+        st.write(f"Tax Refund: £{row.get('Tax Refund', 0):,.0f}")
+        st.write(f"Total Contributions: £{row.get('Total Contribution Cost', 0):,.0f}")
+        st.write(f"Net Contribution Cost: £{row.get('Net Contribution Cost', 0):,.0f}")
     with col4:
         fig = pw.make_income_breakdown_pie(income)
         st.plotly_chart(fig, use_container_width=True)
