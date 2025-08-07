@@ -56,7 +56,7 @@ def make_contribution_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt
     return chart
 
 
-def make_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart:
+def make_pot_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart:
     """
     Create a line chart for each pot's nominal value over time.
 
@@ -69,7 +69,6 @@ def make_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart
     if title is None:
         title = "Pre-retirement nominal growth of each pot"
 
-    # Melt the DataFrame to long format for Altair
     plot_df = df.melt(
         id_vars=["Age"],
         value_vars=["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"],
@@ -88,6 +87,112 @@ def make_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart
         .properties(title=title)
     )
     return chart
+
+
+def make_contribution_growth_plot(
+    df: pd.DataFrame, title: Optional[str] = None
+) -> alt.Chart:
+    """
+    Create a line chart for net contributions from each account over time.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing projection results from project_retirement.
+        title (str, optional): Custom title for the chart. If None, uses default title.
+    Returns:
+        alt.Chart: Altair chart object showing net contributions over time.
+    """
+    if title is None:
+        title = "Net contributions by account over time"
+
+    plot_df = df.melt(
+        id_vars=["Age"],
+        value_vars=[
+            "LISA Net",
+            "ISA Net",
+            "SIPP Employee Net",
+            "Workplace Employee Net",
+        ],
+        var_name="Account",
+        value_name="Net Contribution",
+    )
+    chart = (
+        alt.Chart(plot_df)
+        .mark_line(strokeDash=[4, 2])
+        .encode(
+            x=alt.X("Age:O", title="Age"),
+            y=alt.Y("Net Contribution:Q", title="Net contribution (£)", stack=None),
+            color=alt.Color("Account:N", title="Account (Net Contribution)"),
+            tooltip=["Account", "Net Contribution"],
+        )
+        .properties(title=title)
+    )
+    return chart
+
+
+def make_growth_plot(df: pd.DataFrame, title: Optional[str] = None) -> alt.Chart:
+    """
+    Create a layered chart showing both pot growth and net contributions over time.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing projection results from project_retirement.
+        title (str, optional): Custom title for the chart. If None, uses default title.
+    Returns:
+        alt.Chart: Altair chart object showing both pot growth and net contributions.
+    """
+    # Prepare pot growth data
+    pot_df = df.melt(
+        id_vars=["Age"],
+        value_vars=["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"],
+        var_name="Account",
+        value_name="Value",
+    )
+    pot_chart = (
+        alt.Chart(pot_df)
+        .mark_line()
+        .encode(
+            x=alt.X("Age:O", title="Age"),
+            y=alt.Y("Value:Q", title="Amount (£)", stack=None),
+            color=alt.Color("Account:N", title="Account"),
+            tooltip=["Account", "Value"],
+            detail="Account:N",
+        )
+    )
+
+    # Prepare accumulated net contribution data (dashed lines)
+    acc_contrib_df = df.melt(
+        id_vars=["Age"],
+        value_vars=[
+            "Accumulated LISA Net",
+            "Accumulated ISA Net",
+            "Accumulated SIPP Net",
+            "Accumulated Workplace Net",
+        ],
+        var_name="Account",
+        value_name="Accumulated Contribution",
+    )
+    # Clean up account names for legend
+    acc_contrib_df["Account"] = acc_contrib_df["Account"].str.replace(
+        "Accumulated ", "", regex=False
+    )
+
+    acc_contrib_chart = (
+        alt.Chart(acc_contrib_df)
+        .mark_line(strokeDash=[4, 2])
+        .encode(
+            x=alt.X("Age:O", title="Age"),
+            y=alt.Y("Accumulated Contribution:Q", title="Amount (£)", stack=None),
+            color=alt.Color("Account:N", title="Account (Accumulated)"),
+            tooltip=["Account", "Accumulated Contribution"],
+            detail="Account:N",
+        )
+    )
+
+    # Layer both charts
+    layered = alt.layer(pot_chart, acc_contrib_chart).resolve_scale(color="independent")
+    layered = layered.properties(
+        title=title or "Pot values and accumulated contributions by account over time"
+    )
+    return layered
 
 
 def make_combined_plot(df: pd.DataFrame) -> alt.Chart:

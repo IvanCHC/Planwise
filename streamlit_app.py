@@ -917,7 +917,7 @@ def show_salary_and_contribution_breakdown(
     income: pw.IncomeBreakdown, first_row: pd.Series
 ) -> None:
     """Display a breakdown of salary and contributions for the first year, using the input income object for salary/tax."""
-    st.subheader("First Year: Salary & Contribution Breakdown")
+    st.subheader("Salary & Contribution Breakdown")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.write("**Salary & Take-home:**")
@@ -925,6 +925,9 @@ def show_salary_and_contribution_breakdown(
         st.write(f"Take-home: £{getattr(income, 'take_home_salary', 0):,.0f}")
         st.write(f"Income Tax: £{getattr(income, 'income_tax', 0):,.0f}")
         st.write(f"NI Contribution: £{getattr(income, 'ni_due', 0):,.0f}")
+        st.write(
+            f"Take-home (after contributions): £{getattr(income, 'take_home_salary', 0)-first_row.get('Net Contribution Cost', 0):,.0f}"
+        )
     with col2:
         st.write("**Net Contributions:**")
         st.write(f"LISA: £{first_row.get('LISA Net', 0):,.0f}")
