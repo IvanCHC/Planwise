@@ -439,6 +439,7 @@ def project_post_retirement(
     withdraw_plan: list,
     inflation: float = 0.02,
     end_age: int = 100,
+    current_age: int = 30,
 ) -> pd.DataFrame:
     """
     Project post-retirement account balances and withdrawals using a drawdown strategy.
@@ -460,7 +461,6 @@ def project_post_retirement(
         raise ValueError("Input data frame must contain an 'Age' column.")
 
     df_sorted = df.sort_values("Age")
-    current_age = int(df_sorted["Age"].iloc[-1])
     account_columns = _find_account_columns_postret(df_sorted)
     starting_pots = {
         acc: float(df_sorted[col].iloc[-1]) for acc, col in account_columns.items()
@@ -489,14 +489,15 @@ def project_post_retirement(
 
     records = []
     pots = starting_pots.copy()
-    cumulative_inflation = 1.0
-    for age in range(current_age + 1, end_age + 1):
+    for age in range(int(df_sorted["Age"].iloc[-1]) + 1, end_age + 1):
         # Apply growth
         for acc, value in pots.items():
             growth_rate = account_rois.get(acc, 0.0)
             pots[acc] = value * (1.0 + growth_rate)
 
-        cumulative_inflation *= 1.0 + inflation
+        # Inflation should be compounded from current_age, not retirement age
+        years_since_current = age - current_age
+        cumulative_inflation = (1.0 + inflation) ** years_since_current
         nominal_withdrawal = withdrawal_today * cumulative_inflation
         remaining_withdrawal = nominal_withdrawal
         shortfall = 0.0

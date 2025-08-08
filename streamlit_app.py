@@ -193,7 +193,18 @@ def contribution_rates_section(
     qualifying_earnings: float,
     qualifying_upper: float,
     qualifying_lower: float,
-) -> Tuple[float, float, float, float, float, float, float, float, float, float,]:
+) -> Tuple[
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+    float,
+]:
     """Collect contribution rates for each tax wrapper.
 
     This function handles the complex logic of enforcing annual allowances and
@@ -523,19 +534,17 @@ def returns_section() -> Tuple[float, float, float, float, float]:
     return roi_lisa, roi_isa, roi_sipp, roi_workplace, inflation
 
 
-def sidebar_inputs() -> (
-    Tuple[
-        "pw.core.UserProfile",
-        "pw.core.ContributionRates",
-        "pw.core.InvestmentReturns",
-        "pw.core.IncomeBreakdown",
-        float,
-        bool,
-        int,
-        int,
-        int,
-    ]
-):
+def sidebar_inputs() -> Tuple[
+    "pw.core.UserProfile",
+    "pw.core.ContributionRates",
+    "pw.core.InvestmentReturns",
+    "pw.core.IncomeBreakdown",
+    float,
+    bool,
+    int,
+    int,
+    int,
+]:
     """Gather all user inputs from the sidebar.
 
     This orchestrates calls to the helper functions defined above. It
@@ -995,6 +1004,12 @@ def post_retirement_projection_section(
     stc.subheader("Post-Retirement Projection")
 
     # Run projection
+    # Pass current_age to ensure inflation is compounded from current age
+    current_age = (
+        int(pre_retirement_df["Age"].iloc[0])
+        if "Age" in pre_retirement_df.columns
+        else 30
+    )
     post_df = pw.core.project_post_retirement(
         pre_retirement_df,
         withdrawal_today=withdrawal_today,
@@ -1002,6 +1017,7 @@ def post_retirement_projection_section(
         withdraw_plan=plan,
         inflation=inflation,
         end_age=100,
+        current_age=current_age,
     )
 
     with stc.expander("Show post-retirement projection table"):
