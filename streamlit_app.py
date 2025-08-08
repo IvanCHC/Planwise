@@ -544,6 +544,8 @@ def sidebar_inputs() -> Tuple[
     int,
     int,
     int,
+    int,  # state_pension_age
+    float,  # state_pension_amount
 ]:
     """Gather all user inputs from the sidebar.
 
@@ -598,6 +600,28 @@ def sidebar_inputs() -> Tuple[
     # Step 6: expected returns & inflation
     roi_lisa, roi_isa, roi_sipp, roi_workplace, inflation = returns_section()
 
+    # Step 7: state pension input
+    with st.sidebar.expander("State Pension", expanded=False):
+        st.markdown(
+            "Enter your expected state pension details. The full new state pension (2025/26) is £11,502/year, paid from age 67 for most people."
+        )
+        state_pension_age = st.number_input(
+            "State pension age",
+            min_value=55,
+            max_value=80,
+            value=67,
+            step=1,
+            key="state_pension_age",
+        )
+        state_pension_amount = st.number_input(
+            "Annual state pension (£)",
+            min_value=0.0,
+            max_value=20000.0,
+            value=11502.0,
+            step=100.0,
+            key="state_pension_amount",
+        )
+
     # Construct planwise objects based on the collected values
     user = pw.core.UserProfile(
         current_age=current_age,
@@ -638,6 +662,8 @@ def sidebar_inputs() -> Tuple[
         tax_year,
         current_age,
         retirement_age,
+        state_pension_age,
+        state_pension_amount,
     )
 
 
@@ -896,6 +922,8 @@ def main() -> None:
         tax_year,
         current_age,
         retirement_age,
+        state_pension_age,
+        state_pension_amount,
     ) = sidebar_inputs()
 
     try:
@@ -922,6 +950,8 @@ def main() -> None:
             returns=returns,
             inflation=inflation,
             retirement_age=retirement_age,
+            state_pension_age=state_pension_age,
+            state_pension_amount=state_pension_amount,
         )
 
     except Exception as e:
@@ -936,6 +966,8 @@ def post_retirement_projection_section(
     returns: "pw.core.InvestmentReturns",
     inflation: float,
     retirement_age: int,
+    state_pension_age: int = 67,
+    state_pension_amount: float = 11502.0,
     st_container: None = None,
 ) -> pd.DataFrame:
     """
@@ -961,18 +993,24 @@ def post_retirement_projection_section(
             key="postret_withdrawal_today",
         )
 
-        # Default withdrawal plan: deplete SIPP/Workplace first, then ISA, then LISA
-        available_accounts = [
-            acc
-            for acc in ["SIPP", "Workplace", "ISA", "LISA"]
-            if f"Pot {acc}" in pre_retirement_df.columns
-        ]
+        # Combine SIPP and Workplace into Pension for withdrawal plan
+        # Only include Pension if either SIPP or Workplace exists
+        has_sipp = "Pot SIPP" in pre_retirement_df.columns
+        has_workplace = "Pot Workplace" in pre_retirement_df.columns
+        available_accounts = []
+        if has_sipp or has_workplace:
+            available_accounts.append("Pension")
+        if "ISA" in [c.replace("Pot ", "") for c in pre_retirement_df.columns]:
+            available_accounts.append("ISA")
+        if "LISA" in [c.replace("Pot ", "") for c in pre_retirement_df.columns]:
+            available_accounts.append("LISA")
+
         default_plan = []
         for acc in available_accounts:
             if acc == "LISA":
                 start_age = retirement_age
                 min_age = 60
-            elif acc in ("SIPP", "Workplace"):
+            elif acc == "Pension":
                 start_age = retirement_age
                 min_age = min(55, retirement_age)
             elif acc == "ISA":
@@ -1010,6 +1048,9 @@ def post_retirement_projection_section(
         if "Age" in pre_retirement_df.columns
         else 30
     )
+
+    # --- State pension logic ---
+    # We'll add state pension as a column to the post-retirement df after projection
     post_df = pw.core.project_post_retirement(
         pre_retirement_df,
         withdrawal_today=withdrawal_today,
@@ -1020,20 +1061,61 @@ def post_retirement_projection_section(
         current_age=current_age,
     )
 
+    # Combine SIPP and Workplace into Pension for all post-retirement calculations
+    if "Pot SIPP" in post_df.columns and "Pot Workplace" in post_df.columns:
+        post_df["Pension"] = post_df["Pot SIPP"] + post_df["Pot Workplace"]
+    elif "Pot SIPP" in post_df.columns:
+        post_df["Pension"] = post_df["Pot SIPP"]
+    elif "Pot Workplace" in post_df.columns:
+        post_df["Pension"] = post_df["Pot Workplace"]
+
+    # Add state pension column: paid from state_pension_age onwards, inflation-adjusted
+    if "Age" in post_df.columns:
+        post_df["State Pension"] = post_df["Age"].apply(
+            lambda age: (
+                state_pension_amount * ((1 + inflation) ** (age - current_age))
+                if age >= state_pension_age
+                else 0.0
+            )
+        )
+    else:
+        post_df["State Pension"] = 0.0
+
     with stc.expander("Show post-retirement projection table"):
         st.dataframe(post_df, use_container_width=True)
 
     col1, col2 = stc.columns(2)
 
-    # Left: total pot/withdrawal/shortfall plot
+    # Left: total pot/withdrawal/shortfall plot (add state pension to withdrawal plot)
     with col1:
+        # If you have a custom plotting function, update it to use 'Pension' instead of SIPP/Workplace
         fig = pw.plotting.plot_post_retirement_withdrawals(post_df)
+        try:
+            import plotly.graph_objs as go
+
+            fig.add_trace(
+                go.Scatter(
+                    x=post_df["Age"],
+                    y=post_df["State Pension"],
+                    mode="lines",
+                    name="State Pension",
+                    line=dict(dash="dot", color="green"),
+                )
+            )
+        except Exception:
+            pass
         st.plotly_chart(fig, use_container_width=True)
 
     # Right: plot each account's pot over time (now in plotting module)
     with col2:
+        # Call without account_names argument to avoid error
         fig_accounts = pw.plotting.plot_postretirement_accounts(post_df)
         st.plotly_chart(fig_accounts, use_container_width=True)
+
+    # Show state pension as a summary below
+    stc.info(
+        f"State pension of £{state_pension_amount:,.0f}/year (inflation-adjusted) is added from age {state_pension_age}."
+    )
 
     return post_df
 

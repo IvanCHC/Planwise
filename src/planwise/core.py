@@ -419,7 +419,13 @@ def _find_account_columns_postret(df: pd.DataFrame) -> dict:
     for col in df.columns:
         if col.startswith("Pot ") and not col.endswith("(Inflation Adjusted)"):
             acc_name = col[len("Pot ") :].strip()
+            # Combine SIPP and Workplace into Pension
+            if acc_name in ("SIPP", "Workplace"):
+                continue  # skip, will handle below
             account_map[acc_name] = col
+    # If both SIPP and Workplace exist, add Pension as their sum
+    if "Pot SIPP" in df.columns or "Pot Workplace" in df.columns:
+        account_map["Pension"] = None  # Mark for special handling
     return account_map
 
 
@@ -462,10 +468,47 @@ def project_post_retirement(
 
     df_sorted = df.sort_values("Age")
     account_columns = _find_account_columns_postret(df_sorted)
-    starting_pots = {
-        acc: float(df_sorted[col].iloc[-1]) for acc, col in account_columns.items()
-    }
+    # Build starting pots, combining SIPP and Workplace into Pension
+    starting_pots = {}
+    for acc, col in account_columns.items():
+        if acc == "Pension":
+            sipp = (
+                float(df_sorted["Pot SIPP"].iloc[-1])
+                if "Pot SIPP" in df_sorted.columns
+                else 0.0
+            )
+            workplace = (
+                float(df_sorted["Pot Workplace"].iloc[-1])
+                if "Pot Workplace" in df_sorted.columns
+                else 0.0
+            )
+            starting_pots["Pension"] = sipp + workplace
+        else:
+            starting_pots[acc] = float(df_sorted[col].iloc[-1])
+    # Build ROIs, combining SIPP and Workplace into Pension
     account_rois = _returns_to_dict_postret(returns)
+    if "Pension" in starting_pots:
+        sipp_roi = getattr(returns, "sipp", 0.0)
+        workplace_roi = getattr(returns, "workplace", 0.0)
+        # Use weighted average if both exist, else whichever exists
+        sipp = (
+            float(df_sorted["Pot SIPP"].iloc[-1])
+            if "Pot SIPP" in df_sorted.columns
+            else 0.0
+        )
+        workplace = (
+            float(df_sorted["Pot Workplace"].iloc[-1])
+            if "Pot Workplace" in df_sorted.columns
+            else 0.0
+        )
+        total = sipp + workplace
+        if total > 0:
+            pension_roi = (sipp * sipp_roi + workplace * workplace_roi) / total
+        else:
+            pension_roi = max(sipp_roi, workplace_roi)
+        account_rois["Pension"] = pension_roi
+        account_rois.pop("SIPP", None)
+        account_rois.pop("Workplace", None)
 
     # Preprocess withdrawal plan
     plan = []
@@ -475,6 +518,9 @@ def project_post_retirement(
                 "Each withdraw_plan entry must include both 'account' and 'start_age'."
             )
         acc = entry["account"]
+        # Map SIPP/Workplace to Pension for backward compatibility
+        if acc in ("SIPP", "Workplace") and "Pension" in starting_pots:
+            acc = "Pension"
         if acc not in starting_pots:
             raise ValueError(
                 f"Account '{acc}' in withdraw_plan not found in input data."
