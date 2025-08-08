@@ -970,7 +970,7 @@ def post_retirement_projection_section(
                 start_age = retirement_age
                 min_age = 0
             else:
-                start_age = int(retirement_age)
+                start_age = retirement_age
                 min_age = retirement_age
             default_plan.append(
                 {"account": acc, "start_age": start_age, "min_age": min_age}
@@ -981,7 +981,7 @@ def post_retirement_projection_section(
         for entry in default_plan:
             start_age = int(
                 st.number_input(
-                    f"Start age for {acc}",
+                    f"Start age for {entry['account']}",
                     min_value=entry["min_age"],
                     max_value=100,
                     value=entry["start_age"],
@@ -989,7 +989,7 @@ def post_retirement_projection_section(
                     key=f"withdraw_start_{str(entry['account'])}",
                 )
             )
-            plan.append({"account": acc, "start_age": start_age})
+            plan.append({"account": str(entry["account"]), "start_age": start_age})
 
     stc = st_container or st
     stc.subheader("Post-Retirement Projection")
