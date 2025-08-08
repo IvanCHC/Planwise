@@ -1069,18 +1069,6 @@ def post_retirement_projection_section(
     elif "Pot Workplace" in post_df.columns:
         post_df["Pension"] = post_df["Pot Workplace"]
 
-    # Add state pension column: paid from state_pension_age onwards, inflation-adjusted
-    if "Age" in post_df.columns:
-        post_df["State Pension"] = post_df["Age"].apply(
-            lambda age: (
-                state_pension_amount * ((1 + inflation) ** (age - current_age))
-                if age >= state_pension_age
-                else 0.0
-            )
-        )
-    else:
-        post_df["State Pension"] = 0.0
-
     with stc.expander("Show post-retirement projection table"):
         st.dataframe(post_df, use_container_width=True)
 
@@ -1111,11 +1099,6 @@ def post_retirement_projection_section(
         # Call without account_names argument to avoid error
         fig_accounts = pw.plotting.plot_postretirement_accounts(post_df)
         st.plotly_chart(fig_accounts, use_container_width=True)
-
-    # Show state pension as a summary below
-    stc.info(
-        f"State pension of £{state_pension_amount:,.0f}/year (inflation-adjusted) is added from age {state_pension_age}."
-    )
 
     return post_df
 

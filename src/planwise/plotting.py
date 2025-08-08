@@ -1,3 +1,134 @@
+import plotly.graph_objs as go
+
+
+def plot_post_retirement_withdrawals_todays(df: pd.DataFrame) -> go.Figure:
+    """
+    Plot post-retirement withdrawals and pots using only Today's Money columns.
+    """
+    fig = go.Figure()
+    # Plot Total Pot (Today's Money)
+    if "Total Pot (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Total Pot (Today's Money)"],
+                mode="lines",
+                name="Total Pot (Today's Money)",
+                line=dict(color="navy", width=2),
+            )
+        )
+    # Plot Withdrawal (Today's Money)
+    if "Withdrawal (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Withdrawal (Today's Money)"],
+                mode="lines",
+                name="Withdrawal (Today's Money)",
+                line=dict(color="darkorange", dash="dot"),
+            )
+        )
+    # Plot Remaining Withdrawal Shortfall
+    if (
+        "Remaining Withdrawal Shortfall" in df.columns
+        and (df["Remaining Withdrawal Shortfall"] > 0).any()
+    ):
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Remaining Withdrawal Shortfall"],
+                mode="lines",
+                name="Withdrawal Shortfall",
+                line=dict(color="red", dash="dot"),
+            )
+        )
+    # Plot State Pension (Today's Money)
+    if "State Pension (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["State Pension (Today's Money)"],
+                mode="lines",
+                name="State Pension (Today's Money)",
+                line=dict(color="green", dash="dot"),
+            )
+        )
+    return fig
+
+
+def plot_postretirement_accounts_todays(df: pd.DataFrame) -> go.Figure:
+    """
+    Plot post-retirement account pots using only Today's Money columns.
+    """
+    fig = go.Figure()
+    # Plot Pension (Today's Money)
+    if "Pot SIPP" in df.columns and "Pot Workplace" in df.columns:
+        pension_todays = df["Pot SIPP"] + df["Pot Workplace"]
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=pension_todays,
+                mode="lines",
+                name="Pension (Today's Money)",
+                line=dict(color="#1f77b4", width=2),
+            )
+        )
+    elif "Pot SIPP" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot SIPP"],
+                mode="lines",
+                name="Pension (Today's Money)",
+                line=dict(color="#1f77b4", width=2),
+            )
+        )
+    elif "Pot Workplace" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot Workplace"],
+                mode="lines",
+                name="Pension (Today's Money)",
+                line=dict(color="#1f77b4", width=2),
+            )
+        )
+    # Plot LISA (Today's Money)
+    if "Pot LISA" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot LISA"],
+                mode="lines",
+                name="LISA (Today's Money)",
+                line=dict(color="#ff7f0e", width=2),
+            )
+        )
+    # Plot ISA (Today's Money)
+    if "Pot ISA" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot ISA"],
+                mode="lines",
+                name="ISA (Today's Money)",
+                line=dict(color="#2ca02c", width=2),
+            )
+        )
+    # Plot State Pension (Today's Money)
+    if "State Pension (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["State Pension (Today's Money)"],
+                mode="lines",
+                name="State Pension (Today's Money)",
+                line=dict(color="green", dash="dot"),
+            )
+        )
+    return fig
+
+
 import pandas as pd
 import plotly.graph_objs as go
 
@@ -6,19 +137,24 @@ def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
     import plotly.graph_objs as go
 
     fig = go.Figure()
-    account_cols = [
-        col
-        for col in df.columns
-        if col.startswith("Pot ")
-        and col
-        not in (
-            "Pot LISA (Inflation Adjusted)",
-            "Pot ISA (Inflation Adjusted)",
-            "Pot SIPP (Inflation Adjusted)",
-            "Pot Workplace (Inflation Adjusted)",
-        )
-    ]
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+    # Only plot Pension, LISA, ISA, and optionally State Pension columns
+    account_cols = []
+    if "Pot Pension" in df.columns:
+        account_cols.append("Pot Pension")
+    else:
+        # Fallback for legacy: combine SIPP and Workplace if present
+        if "Pot SIPP" in df.columns and "Pot Workplace" in df.columns:
+            df["Pot Pension"] = df["Pot SIPP"] + df["Pot Workplace"]
+            account_cols.append("Pot Pension")
+        elif "Pot SIPP" in df.columns:
+            account_cols.append("Pot SIPP")
+        elif "Pot Workplace" in df.columns:
+            account_cols.append("Pot Workplace")
+    if "Pot LISA" in df.columns:
+        account_cols.append("Pot LISA")
+    if "Pot ISA" in df.columns:
+        account_cols.append("Pot ISA")
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
     for i, col in enumerate(account_cols):
         fig.add_trace(
             go.Scatter(
@@ -27,6 +163,27 @@ def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
                 mode="lines",
                 name=col.replace("Pot ", ""),
                 line=dict(color=colors[i % len(colors)], width=2),
+            )
+        )
+    # Optionally plot state pension columns if present
+    if "State Pension (Inflation Adjusted)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["State Pension (Inflation Adjusted)"],
+                mode="lines",
+                name="State Pension (Inflation Adjusted)",
+                line=dict(color="#2ca02c", dash="dot", width=2),
+            )
+        )
+    if "State Pension (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["State Pension (Today's Money)"],
+                mode="lines",
+                name="State Pension (Today's Money)",
+                line=dict(color="#17becf", dash="dash", width=2),
             )
         )
     fig.update_layout(
@@ -62,27 +219,49 @@ def plot_post_retirement_withdrawals(df: pd.DataFrame) -> go.Figure:
     """
     fig = go.Figure()
 
-    # Plot total pot
-    fig.add_trace(
-        go.Scatter(
-            x=df["Age"],
-            y=df["Total Pot"],
-            mode="lines",
-            name="Total Pot (Nominal)",
-            line=dict(color="royalblue", width=2),
+    # Plot total pot (nominal and today's money if available)
+    if "Total Pot" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Total Pot"],
+                mode="lines",
+                name="Total Pot (Nominal)",
+                line=dict(color="royalblue", width=2),
+            )
         )
-    )
+    if "Total Pot (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Total Pot (Today's Money)"],
+                mode="lines",
+                name="Total Pot (Today's Money)",
+                line=dict(color="navy", dash="dot", width=2),
+            )
+        )
 
-    # Plot nominal withdrawal
-    fig.add_trace(
-        go.Scatter(
-            x=df["Age"],
-            y=df["Nominal Withdrawal"],
-            mode="lines",
-            name="Nominal Withdrawal",
-            line=dict(color="orange", dash="dash"),
+    # Plot withdrawals (inflation adjusted and today's money)
+    if "Withdrawal (Inflation Adjusted)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Withdrawal (Inflation Adjusted)"],
+                mode="lines",
+                name="Withdrawal (Inflation Adjusted)",
+                line=dict(color="orange", dash="dash"),
+            )
         )
-    )
+    if "Withdrawal (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Withdrawal (Today's Money)"],
+                mode="lines",
+                name="Withdrawal (Today's Money)",
+                line=dict(color="darkorange", dash="dot"),
+            )
+        )
 
     # Plot shortfall if any
     if (
@@ -96,6 +275,28 @@ def plot_post_retirement_withdrawals(df: pd.DataFrame) -> go.Figure:
                 mode="lines",
                 name="Withdrawal Shortfall",
                 line=dict(color="red", dash="dot"),
+            )
+        )
+
+    # Plot state pension columns if present
+    if "State Pension (Inflation Adjusted)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["State Pension (Inflation Adjusted)"],
+                mode="lines",
+                name="State Pension (Inflation Adjusted)",
+                line=dict(color="#2ca02c", dash="dot", width=2),
+            )
+        )
+    if "State Pension (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["State Pension (Today's Money)"],
+                mode="lines",
+                name="State Pension (Today's Money)",
+                line=dict(color="#17becf", dash="dash", width=2),
             )
         )
 

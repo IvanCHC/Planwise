@@ -1,3 +1,15 @@
+import json
+import os
+
+
+# --- State Pension Data Loader ---
+def load_state_pension_db() -> Any:
+    json_path = os.path.join(os.path.dirname(__file__), "data", "state_pension.json")
+    with open(json_path, "r") as f:
+        return json.load(f)
+
+
+STATE_PENSION_DB = load_state_pension_db()
 """
 Core retirement projection calculations for Planwise.
 
@@ -446,6 +458,7 @@ def project_post_retirement(
     inflation: float = 0.02,
     end_age: int = 100,
     current_age: int = 30,
+    year: int = 2025,
 ) -> pd.DataFrame:
     """
     Project post-retirement account balances and withdrawals using a drawdown strategy.
@@ -533,6 +546,12 @@ def project_post_retirement(
             }
         )
 
+    # --- State Pension Projection ---
+    sp_data = STATE_PENSION_DB.get(str(year), {})
+    state_pension_age = sp_data.get("state_pension_age", 67)
+    state_pension_per_year = sp_data.get("state_pension_per_year", 11000.0)
+    uprate_inflation = sp_data.get("uprate_inflation", True)
+
     records = []
     pots = starting_pots.copy()
     for age in range(int(df_sorted["Age"].iloc[-1]) + 1, end_age + 1):
@@ -544,8 +563,9 @@ def project_post_retirement(
         # Inflation should be compounded from current_age, not retirement age
         years_since_current = age - current_age
         cumulative_inflation = (1.0 + inflation) ** years_since_current
-        nominal_withdrawal = withdrawal_today * cumulative_inflation
-        remaining_withdrawal = nominal_withdrawal
+        withdrawal_infl_adj = withdrawal_today * cumulative_inflation
+        withdrawal_todays = withdrawal_today
+        remaining_withdrawal = withdrawal_infl_adj
         shortfall = 0.0
 
         active_plan = [p for p in plan if age >= p["start_age"]]
@@ -562,7 +582,7 @@ def project_post_retirement(
                 proportion = p["proportion"]
                 acc = p["account"]
                 if proportion is not None:
-                    alloc = nominal_withdrawal * proportion
+                    alloc = withdrawal_infl_adj * proportion
                     taken = min(alloc, pots[acc])
                     pots[acc] -= taken
                     remaining_withdrawal -= taken
@@ -582,18 +602,32 @@ def project_post_retirement(
             shortfall = remaining_withdrawal
 
         total_pot = sum(pots.values())
-        total_pot_real = total_pot / cumulative_inflation
+        total_pot_todays = total_pot / cumulative_inflation
+
+        # --- State Pension Calculation ---
+        if age >= state_pension_age:
+            if uprate_inflation:
+                sp_infl_adj = state_pension_per_year * cumulative_inflation
+                sp_todays = state_pension_per_year
+            else:
+                sp_infl_adj = state_pension_per_year
+                sp_todays = state_pension_per_year / cumulative_inflation
+        else:
+            sp_infl_adj = 0.0
+            sp_todays = 0.0
 
         record = {
             "Age": age,
-            "Nominal Withdrawal": nominal_withdrawal,
-            "Real Withdrawal": withdrawal_today,
+            "Withdrawal (Inflation Adjusted)": withdrawal_infl_adj,
+            "Withdrawal (Today's Money)": withdrawal_todays,
         }
         for acc, value in pots.items():
             record[f"Pot {acc}"] = value
         record["Total Pot"] = total_pot
-        record["Total Pot Real"] = total_pot_real
+        record["Total Pot (Today's Money)"] = total_pot_todays
         record["Remaining Withdrawal Shortfall"] = shortfall
+        record["State Pension (Inflation Adjusted)"] = sp_infl_adj
+        record["State Pension (Today's Money)"] = sp_todays
         records.append(record)
 
     result_df = pd.DataFrame(records)
