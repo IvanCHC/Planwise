@@ -979,10 +979,12 @@ def main() -> None:
         # Create top‑level tabs for pre‑ and post‑retirement analysis.  This
         # organisation improves navigation and keeps the UI from becoming
         # cluttered when exploring different aspects of the model.
-        pre_tab, post_tab = st.tabs([
-            "Pre‑Retirement Analysis",
-            "Post‑Retirement Analysis",
-        ])
+        pre_tab, post_tab = st.tabs(
+            [
+                "Pre‑Retirement Analysis",
+                "Post‑Retirement Analysis",
+            ]
+        )
 
         with pre_tab:
             final_row, total_final = show_summary_metrics(df)
@@ -1120,7 +1122,32 @@ def post_retirement_projection_section(
         post_df["Pension"] = post_df["Pot Workplace"]
 
     with stc.expander("Show post-retirement projection table"):
-        st.dataframe(post_df, use_container_width=True)
+        # Format all float columns as pounds and round to nearest integer
+        money_cols = [
+            col
+            for col in post_df.columns
+            if post_df[col].dtype.kind in {"f", "i"}
+            and any(
+                kw in col.lower()
+                for kw in [
+                    "pot",
+                    "withdrawal",
+                    "shortfall",
+                    "pension",
+                    "isa",
+                    "lisa",
+                    "sipp",
+                    "workplace",
+                    "amount",
+                    "balance",
+                ]
+            )
+        ]
+        fmt_dict = {col: "£{:,.0f}" for col in money_cols}
+        st.dataframe(
+            post_df.style.format(fmt_dict),
+            use_container_width=True,
+        )
 
     col1, col2 = stc.columns(2)
 
@@ -1128,20 +1155,6 @@ def post_retirement_projection_section(
     with col1:
         # If you have a custom plotting function, update it to use 'Pension' instead of SIPP/Workplace
         fig = pw.plotting.plot_post_retirement_withdrawals(post_df)
-        try:
-            import plotly.graph_objs as go
-
-            fig.add_trace(
-                go.Scatter(
-                    x=post_df["Age"],
-                    y=post_df["State Pension"],
-                    mode="lines",
-                    name="State Pension",
-                    line=dict(dash="dot", color="green"),
-                )
-            )
-        except Exception:
-            pass
         st.plotly_chart(fig, use_container_width=True)
 
     # Right: plot each account's pot over time (now in plotting module)
