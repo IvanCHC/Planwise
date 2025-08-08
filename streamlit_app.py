@@ -900,17 +900,6 @@ def main() -> None:
             year=tax_year,
         )
 
-        # --- Add inflation-adjusted (real) pot values ---
-        inflation_rate_col = pd.Series([inflation] * len(df))
-        # Compute cumulative inflation factor for each year
-        cumulative_inflation = (1 + inflation_rate_col).cumprod()
-        # Set first year to 1.0 (no adjustment)
-        cumulative_inflation.iloc[0] = 1.0
-        # Add real (inflation-adjusted) columns for each pot
-        for pot in ["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"]:
-            if pot in df.columns:
-                df[f"{pot} (Inflation Adjusted)"] = df[pot] / cumulative_inflation
-
         final_row, total_final = show_summary_metrics(df)
         show_salary_and_contribution_breakdown(income, df)
         show_final_breakdown(final_row, total_final)

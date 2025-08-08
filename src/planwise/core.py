@@ -218,7 +218,7 @@ def project_retirement(
         year (int): Tax year to use for income tax calculations (e.g., 2025 for 2025/26).
 
     Returns:
-        pd.DataFrame: DataFrame with each year's age and financial metrics.
+        pd.DataFrame: DataFrame with each year's age and financial metrics. Adds inflation-adjusted columns for each pot.
     """
     years = user.retirement_age - user.current_age
 
@@ -398,4 +398,17 @@ def project_retirement(
         )
 
     df = pd.DataFrame(records)
+
+    # --- Add inflation-adjusted (real) pot values ---
+    if inflation is not None and len(df) > 0:
+        inflation_rate_col = pd.Series([inflation] * len(df))
+        # Compute cumulative inflation factor for each year
+        cumulative_inflation = (1 + inflation_rate_col).cumprod()
+        # Set first year to 1.0 (no adjustment)
+        cumulative_inflation.iloc[0] = 1.0
+        # Add real (inflation-adjusted) columns for each pot
+        for pot in ["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"]:
+            if pot in df.columns:
+                df[f"{pot} (Inflation Adjusted)"] = df[pot] / cumulative_inflation
+
     return df
