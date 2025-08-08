@@ -400,6 +400,24 @@ def plot_post_retirement_withdrawals_todays(df: pd.DataFrame) -> go.Figure:
                 line=dict(color="green", dash="dot"),
             )
         )
+    fig.update_layout(
+        title="Post-Retirement Withdrawals and Pot Balances (in Today's Money)",
+        xaxis=dict(title=dict(text="Age", font=dict(size=16)), tickfont=dict(size=14)),
+        yaxis=dict(
+            title=dict(text="Amount (£)", font=dict(size=16)), tickfont=dict(size=14)
+        ),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            font=dict(size=13),
+            orientation="v",
+        ),
+        template="plotly_white",
+        hovermode="x unified",
+        margin=dict(r=120),
+    )
     return fig
 
 

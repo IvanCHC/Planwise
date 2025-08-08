@@ -1157,6 +1157,9 @@ def post_retirement_projection_section(
         fig = pw.plotting.plot_post_retirement_withdrawals(post_df)
         st.plotly_chart(fig, use_container_width=True)
 
+        fig = pw.plotting.plot_post_retirement_withdrawals_todays(post_df)
+        st.plotly_chart(fig, use_container_width=True)
+
     # Right: plot each account's pot over time (now in plotting module)
     with col2:
         # Call without account_names argument to avoid error
