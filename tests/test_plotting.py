@@ -8,11 +8,7 @@ as well as integration with real projection data.
 import pandas as pd
 import pytest
 
-from planwise.plotting import (
-    make_combined_plot,
-    make_contribution_plot,
-    make_growth_plot,
-)
+from planwise.plotting import RetirementPlotter
 
 
 @pytest.fixture
@@ -54,7 +50,8 @@ class TestMakeContributionPlot:
         """
         Test that contribution plot is created successfully and is an Altair chart.
         """
-        chart = make_contribution_plot(sample_projection_data)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.contribution_chart()
 
         # Check it's an Altair chart
         assert hasattr(chart, "to_dict")
@@ -69,7 +66,8 @@ class TestMakeContributionPlot:
         Test contribution plot with a custom title.
         """
         custom_title = "Custom Contribution Analysis"
-        chart = make_contribution_plot(sample_projection_data, title=custom_title)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.contribution_chart(title=custom_title)
 
         chart_dict = chart.to_dict()
         assert chart_dict["title"] == custom_title
@@ -78,7 +76,8 @@ class TestMakeContributionPlot:
         """
         Test that the plot uses the correct data structure and encodings.
         """
-        chart = make_contribution_plot(sample_projection_data)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.contribution_chart()
         chart_dict = chart.to_dict()
 
         # Check encoding uses the right fields
@@ -96,7 +95,8 @@ class TestMakeGrowthPlot:
         """
         Test that growth plot is created successfully and is an Altair chart.
         """
-        chart = make_growth_plot(sample_projection_data)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.growth_chart()
 
         # Check it's an Altair chart
         assert hasattr(chart, "to_dict")
@@ -111,7 +111,8 @@ class TestMakeGrowthPlot:
         Test growth plot with a custom title.
         """
         custom_title = "Custom Growth Analysis"
-        chart = make_growth_plot(sample_projection_data, title=custom_title)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.growth_chart(title=custom_title)
 
         chart_dict = chart.to_dict()
         assert chart_dict["title"] == custom_title
@@ -120,7 +121,8 @@ class TestMakeGrowthPlot:
         """
         Test that the plot uses the correct data structure and encodings.
         """
-        chart = make_growth_plot(sample_projection_data)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.growth_chart()
         chart_dict = chart.to_dict()
 
         # Check encoding uses the right fields
@@ -138,7 +140,8 @@ class TestMakeCombinedPlot:
         """
         Test that combined plot is created successfully and is an Altair chart.
         """
-        chart = make_combined_plot(sample_projection_data)
+        builder = RetirementPlotter(sample_projection_data)
+        chart = builder.combined_chart()
 
         # Check it's an Altair chart
         assert hasattr(chart, "to_dict")
@@ -213,13 +216,14 @@ class TestPlottingIntegration:
             year=2025,
         )
 
-        # Test all plotting functions work
-        contrib_chart = make_contribution_plot(result)
-        growth_chart = make_growth_plot(result)
-        combined_chart = make_combined_plot(result)
-
-        # All should be valid Altair charts
-        for chart in [contrib_chart, growth_chart, combined_chart]:
+        # Create a plotter and test all chart methods
+        builder = RetirementPlotter(result)
+        charts = [
+            builder.contribution_chart(),
+            builder.growth_chart(),
+            builder.combined_chart(),
+        ]
+        for chart in charts:
             assert hasattr(chart, "to_dict")
             chart_dict = chart.to_dict()
             assert isinstance(chart_dict, dict)

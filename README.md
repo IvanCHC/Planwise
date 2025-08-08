@@ -110,20 +110,29 @@ planwise \
 
 ### Plotting
 
+The preferred way to build charts from your projection results is via the
+``RetirementPlotter`` class in the :mod:`planwise.plotting` module.  Create
+an instance with your DataFrame and call its methods to obtain Altair charts:
+
 ```python
 import planwise as pw
 
-# Run projection
+# Run a projection
 results = pw.project_retirement(...)
 
-# Create visualization
-contrib_chart = pw.make_contribution_plot(results)
-growth_chart = pw.make_growth_plot(results)
+# Build charts
+plotter = pw.RetirementPlotter(results)
+contrib_chart = plotter.contribution_chart()
+growth_chart = plotter.growth_chart()
 
 # Save charts (requires altair)
 contrib_chart.save('contributions.html')
 growth_chart.save('growth.html')
 ```
+
+For backwards compatibility the functions ``make_contribution_plot`` and
+``make_growth_plot`` remain available on the top level of ``planwise.plotting``
+and behave identically to the corresponding methods on ``RetirementPlotter``.
 
 ### Streamlit App
 

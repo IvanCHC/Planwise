@@ -202,29 +202,15 @@ Get NI bands for a given year and category.
 **Returns:**
 - `List[NICBand]`: List of [`planwise.ni.NICBand`](src/planwise/ni.py) objects
 
-### Plotting Functions
+### Plotting API
 
-#### `make_contribution_plot(df, title=None)`
+Visualization of projection data is provided by the :class:`planwise.plotting.RetirementPlotter` class.  The class accepts a DataFrame from :func:`planwise.core.project_retirement` and exposes methods to build Altair charts for contributions, pot growth and a combined view:
 
-Create contribution breakdown chart.
+* ``RetirementPlotter.contribution_chart(title=None)`` – return a stacked bar chart showing the share of net contributions by account.  Pass a custom ``title`` to override the default.
+* ``RetirementPlotter.growth_chart(title=None)`` – return a line chart showing both pot values and accumulated contributions for each account.  Pots are drawn with solid lines while accumulated contributions are drawn with dashed lines.  If the DataFrame lacks pre‑computed accumulated columns, cumulative sums of the annual net contributions are computed on the fly.
+* ``RetirementPlotter.combined_chart(contrib_title=None, growth_title=None)`` – horizontally concatenate the contributions and growth charts into a single figure.
 
-#### `make_growth_plot(df, title=None)`
-
-Create a line chart showing the nominal pot values for each account and, where
-available, the cumulative net contributions over time.  Solid lines represent
-the pots’ nominal values while dashed lines represent the accumulated net
-contributions into each wrapper.  If the DataFrame passed to this function
-lacks the pre‑computed ``Accumulated <Account> Net`` columns (for example,
-when using custom sample data in tests), the cumulative net contributions
-are computed on the fly from the yearly net contribution columns (e.g.,
-``LISA Net``, ``ISA Net``).  The function always returns a single Altair
-``Chart`` with a top‑level ``mark`` of type ``line``, ensuring that the
-resulting chart can be further composed or inspected without the complexity
-of layered specifications.
-
-#### `make_combined_plot(df)`
-
-Create combined contributions and growth chart.
+For convenience and backward compatibility, the module still exports the functions ``make_contribution_plot(df, title=None)``, ``make_growth_plot(df, title=None)`` and ``make_combined_plot(df)`` which simply instantiate a :class:`RetirementPlotter` internally and delegate to the corresponding methods.
 
 ## Examples
 

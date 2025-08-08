@@ -861,12 +861,22 @@ def show_visualizations(df: pd.DataFrame) -> None:
 
         with col1:
             st.subheader("Annual Contributions")
-            contrib_chart = pw.make_contribution_plot(df)
+            # Prefer the class-based interface for plotting
+            try:
+                plotter = pw.RetirementPlotter(df)
+                contrib_chart = plotter.contribution_chart()
+            except Exception:
+                # Fall back to the old wrapper if instantiation fails
+                contrib_chart = pw.make_contribution_plot(df)
             st.altair_chart(contrib_chart, use_container_width=True)
 
         with col2:
             st.subheader("Pot Growth Over Time")
-            growth_chart = pw.make_growth_plot(df)
+            try:
+                plotter = pw.RetirementPlotter(df)
+                growth_chart = plotter.growth_chart()
+            except Exception:
+                growth_chart = pw.make_growth_plot(df)
             st.altair_chart(growth_chart, use_container_width=True)
 
     except ImportError:

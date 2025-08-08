@@ -9,6 +9,7 @@ Pension (SIPP) and workplace pensions.
 from .core import IncomeBreakdown, project_post_retirement, project_retirement
 from .ni import NICBand, calculate_ni
 from .plotting import (
+    RetirementPlotter,
     make_contribution_plot,
     make_growth_plot,
     make_income_breakdown_pie,
@@ -22,6 +23,7 @@ __all__ = [
     "calculate_income_tax",
     "get_tax_bands",
     "TaxBand",
+    "RetirementPlotter",
     "make_contribution_plot",
     "make_growth_plot",
 ]
