@@ -11,7 +11,9 @@ import pytest
 
 from planwise.core import (
     ContributionRates,
+    IncomeBreakdown,
     InvestmentReturns,
+    RetirementSimulator,
     UserProfile,
     calculate_lisa_isa_contributions,
     calculate_pension_contributions,
@@ -507,6 +509,68 @@ class TestProjectRetirement:
         # ISA: 20% of 100,000 = 20,000, but only 20,000 - 5,000 = 15,000 allowed
         assert result["lisa_net"] == 4000
         assert result["lisa_gross"] == 5000
+
+    def test_retirement_simulator_equivalence(self):
+        """
+        Ensure that the RetirementSimulator class produces the same results
+        as the project_retirement convenience function.  The simulator is a
+        refactoring of the original projection logic; this test guards
+        against inadvertent divergences between the two interfaces.
+        """
+
+        user = UserProfile(
+            current_age=35,
+            retirement_age=40,
+            salary=50000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.02,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
+            shift_lisa_to_isa=0.5,
+            shift_lisa_to_sipp=0.5,
+        )
+        returns = InvestmentReturns(
+            lisa=0.05,
+            isa=0.05,
+            sipp=0.05,
+            workplace=0.05,
+        )
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        df_func = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.02,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
+        simulator = RetirementSimulator(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.02,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
+        df_class = simulator.simulate()
+        # Compare DataFrames; ignore index and column order
+        pd.testing.assert_frame_equal(
+            df_func.reset_index(drop=True)[df_class.columns],
+            df_class.reset_index(drop=True),
+            check_dtype=False,
+        )
 
     def test_pension_contributions_basic(self):
         """

@@ -1,16 +1,3 @@
-import json
-import os
-from typing import Any
-
-
-# --- State Pension Data Loader ---
-def load_state_pension_db() -> Any:
-    json_path = os.path.join(os.path.dirname(__file__), "data", "state_pension.json")
-    with open(json_path, "r") as f:
-        return json.load(f)
-
-
-STATE_PENSION_DB = load_state_pension_db()
 """
 Core retirement projection calculations for Planwise.
 
@@ -28,6 +15,15 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from .tax import calculate_income_tax
+
+
+def load_state_pension_db() -> Any:
+    json_path = os.path.join(os.path.dirname(__file__), "data", "state_pension.json")
+    with open(json_path, "r") as f:
+        return json.load(f)
+
+
+STATE_PENSION_DB = load_state_pension_db()
 
 
 @dataclass
@@ -210,100 +206,118 @@ def calculate_pension_contributions(
 LIMITS_DB = load_limits_db()
 
 
-def project_retirement(
-    user: UserProfile,
-    contrib: ContributionRates,
-    returns: InvestmentReturns,
-    income: IncomeBreakdown,
-    inflation: float,
-    use_qualifying_earnings: bool,
-    year: int,
-) -> pd.DataFrame:
+class RetirementSimulator:
+    """Helper class to encapsulate retirement projection logic.
+
+    This class encapsulates the year–by–year simulation of retirement contributions,
+    tax relief and pot growth.  Breaking the logic out of the top–level
+    :func:`project_retirement` improves readability and makes it easier to
+    reason about intermediate calculations.  The public :meth:`simulate` method
+    produces a DataFrame identical to the original implementation, so
+    existing code and tests that rely on :func:`project_retirement` continue
+    to work unchanged.
     """
-    Compute the year-by-year contributions, tax relief, and account balances.
 
-    Args:
-        user (UserProfile): User profile including age, retirement age, salary, and region.
-        contrib (ContributionRates): Contribution rates for each wrapper and shift rates after age 50.
-        returns (InvestmentReturns): Expected annual rates of return for each wrapper.
-        inflation (float): Annual inflation rate used to index salary and contributions (decimal).
-        use_qualifying_earnings (bool): If True, workplace pension contributions are calculated on qualifying earnings (£6,240–£50,270). Otherwise, contributions are based on total salary.
-        year (int): Tax year to use for income tax calculations (e.g., 2025 for 2025/26).
+    def __init__(
+        self,
+        user: UserProfile,
+        contrib: ContributionRates,
+        returns: InvestmentReturns,
+        income: IncomeBreakdown,
+        inflation: float,
+        use_qualifying_earnings: bool,
+        year: int,
+    ) -> None:
+        self.user = user
+        self.contrib = contrib
+        self.returns = returns
+        self.income = income
+        self.inflation = inflation
+        self.use_qualifying = use_qualifying_earnings
+        self.year = year
 
-    Returns:
-        pd.DataFrame: DataFrame with each year's age and financial metrics. Adds inflation-adjusted columns for each pot.
-    """
-    years = user.retirement_age - user.current_age
+        # Load annual limits for the selected tax year
+        limits = LIMITS_DB[str(year)]
+        self.qualifying_lower = limits["qualifying_lower"]
+        self.qualifying_upper = limits["qualifying_upper"]
+        self.lisa_limit = limits["lisa_limit"]
+        self.isa_limit = limits["isa_limit"]
+        self.pension_annual_allowance = limits["pension_annual_allowance"]
 
-    # Load annual limits for the selected tax year
-    limits = LIMITS_DB[str(year)]
-    qualifying_lower = limits["qualifying_lower"]
-    qualifying_upper = limits["qualifying_upper"]
-    lisa_limit = limits["lisa_limit"]
-    isa_limit = limits["isa_limit"]
-    pension_annual_allowance = limits["pension_annual_allowance"]
+        # Initialise pots and accumulators
+        self.pot_lisa: float = 0.0
+        self.pot_isa: float = 0.0
+        self.pot_sipp: float = 0.0
+        self.pot_workplace: float = 0.0
 
-    records: List[Dict] = []
+        self.acc_lisa_net: float = 0.0
+        self.acc_lisa_gross: float = 0.0
+        self.acc_isa_net: float = 0.0
+        self.acc_isa_gross: float = 0.0
+        self.acc_sipp_net: float = 0.0
+        self.acc_sipp_gross: float = 0.0
+        self.acc_workplace_net: float = 0.0
+        self.acc_workplace_gross: float = 0.0
 
-    # Initialize account pots and salary
-    pot_lisa = 0.0
-    pot_isa = 0.0
-    pot_sipp = 0.0
-    pot_workplace = 0.0
-    current_salary = user.salary
-    take_home_salary = income.take_home_salary
+        # For contributions we base on take–home salary to mirror
+        # the original implementation
+        self.take_home_salary = income.take_home_salary
+        self.current_salary = user.salary
 
-    # Initialize accumulators for net and gross contributions
-    acc_lisa_net = 0.0
-    acc_lisa_gross = 0.0
-    acc_isa_net = 0.0
-    acc_isa_gross = 0.0
-    acc_sipp_net = 0.0
-    acc_sipp_gross = 0.0
-    acc_workplace_net = 0.0
-    acc_workplace_gross = 0.0
+    def _base_for_workplace(self) -> Any:
+        """Calculate the earnings base for workplace contributions.
 
-    for year_index in range(years):
-        age = user.current_age + year_index
-
-        # Determine the contribution base for workplace pension
-        if use_qualifying_earnings:
+        Returns the qualifying portion of salary when qualifying
+        earnings are enabled.  Otherwise returns the full take–home
+        salary.
+        """
+        if self.use_qualifying:
             qualifying_salary = min(
-                max(take_home_salary - qualifying_lower, 0),
-                qualifying_upper - qualifying_lower,
+                max(self.take_home_salary - self.qualifying_lower, 0.0),
+                self.qualifying_upper - self.qualifying_lower,
             )
-            base_for_workplace = qualifying_salary
+            return qualifying_salary
         else:
-            base_for_workplace = take_home_salary
+            return self.take_home_salary
 
-        # Calculate LISA/ISA contributions and redirections
-        lisa_isa = calculate_lisa_isa_contributions(
-            current_salary=take_home_salary,
-            age=age,
-            contrib=contrib,
-            lisa_limit=lisa_limit,
-            isa_limit=isa_limit,
-        )
-        lisa_net = lisa_isa["lisa_net"]
-        lisa_bonus = lisa_isa["lisa_bonus"]
-        lisa_gross = lisa_isa["lisa_gross"]
-        isa_net = lisa_isa["isa_net"]
-        redirected_sipp_net = lisa_isa["redirected_sipp_net"]
+    def _apply_annual_allowance(
+        self,
+        sipp_employee_net: float,
+        sipp_employee_gross: float,
+        sipp_employer_gross: float,
+        wp_employee_net: float,
+        wp_employee_gross: float,
+        wp_employer_gross: float,
+    ) -> tuple:
+        """Apply the pension annual allowance to employee contributions.
 
-        # Calculate SIPP and workplace pension contributions
-        pensions = calculate_pension_contributions(
-            current_salary=take_home_salary,
-            base_for_workplace=base_for_workplace,
-            contrib=contrib,
-            redirected_sipp_net=redirected_sipp_net,
-        )
-        sipp_employee_net = pensions["sipp_employee_net"]
-        sipp_employee_gross = pensions["sipp_employee_gross"]
-        sipp_employer_gross = pensions["sipp_employer_gross"]
-        wp_employee_net = pensions["wp_employee_net"]
-        wp_employee_gross = pensions["wp_employee_gross"]
-        wp_employer_gross = pensions["wp_employer_gross"]
+        This function caps total gross pension contributions to the annual
+        allowance.  Employee gross contributions are reduced first (SIPP
+        followed by workplace) while employer contributions are left
+        untouched.  The corresponding net amounts are recomputed from the
+        adjusted gross values.
 
+        Parameters
+        ----------
+        sipp_employee_net : float
+            Net SIPP contribution by the employee.
+        sipp_employee_gross : float
+            Gross SIPP contribution by the employee.
+        sipp_employer_gross : float
+            Employer SIPP contributions (no relief at source).
+        wp_employee_net : float
+            Net workplace pension contribution by the employee.
+        wp_employee_gross : float
+            Gross workplace pension contribution by the employee.
+        wp_employer_gross : float
+            Employer workplace pension contributions.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the potentially reduced employee net/gross
+            contributions and the unchanged employer contributions.
+        """
         # Total gross pension contributions (employee and employer)
         total_pension_gross = (
             sipp_employee_gross
@@ -311,76 +325,220 @@ def project_retirement(
             + wp_employee_gross
             + wp_employer_gross
         )
-
-        # Ensure we do not exceed annual allowance; cap employee contributions to respect the allowance
-        if total_pension_gross > pension_annual_allowance:
-            excess = total_pension_gross - pension_annual_allowance
+        if total_pension_gross > self.pension_annual_allowance:
+            excess = total_pension_gross - self.pension_annual_allowance
             # Reduce SIPP employee gross first
             if sipp_employee_gross >= excess:
                 sipp_employee_gross -= excess
                 sipp_employee_net = sipp_employee_gross * 0.8
-                excess = 0
+                excess = 0.0
             else:
                 excess -= sipp_employee_gross
-                sipp_employee_gross = 0
-                sipp_employee_net = 0
+                sipp_employee_gross = 0.0
+                sipp_employee_net = 0.0
                 # Then reduce workplace employee gross
                 if wp_employee_gross >= excess:
                     wp_employee_gross -= excess
                     wp_employee_net = wp_employee_gross * 0.8
-                    excess = 0
+                    excess = 0.0
                 else:
                     excess -= wp_employee_gross
-                    wp_employee_gross = 0
-                    wp_employee_net = 0
-            total_pension_gross = pension_annual_allowance
+                    wp_employee_gross = 0.0
+                    wp_employee_net = 0.0
+            # Employer contributions are not reduced, but we cap the recorded total
+        return (
+            sipp_employee_net,
+            sipp_employee_gross,
+            sipp_employer_gross,
+            wp_employee_net,
+            wp_employee_gross,
+            wp_employer_gross,
+        )
 
-        # Tax calculations
-        tax_before = calculate_income_tax(current_salary, user.scotland, year=year)
-        total_personal_gross = sipp_employee_gross + wp_employee_gross
+    def _compute_tax_relief(self, total_personal_gross: float) -> tuple:
+        """Compute the tax relief for personal pension contributions.
+
+        The function calculates income tax before and after personal
+        contributions and derives the total relief, basic relief at source
+        and any additional refund due.  Note that employer contributions
+        do not affect tax relief.
+
+        Parameters
+        ----------
+        total_personal_gross : float
+            Sum of gross SIPP and workplace contributions made by the employee.
+
+        Returns
+        -------
+        tuple
+            A tuple ``(tax_relief_total, basic_relief, tax_refund)`` where:
+
+            * ``tax_relief_total`` is the difference in income tax before and after contributions.
+            * ``basic_relief`` represents the 20 % relief at source already applied by providers.
+            * ``tax_refund`` is any additional refund due back to the individual.
+        """
+        # Tax before contributions (using gross salary)
+        tax_before = calculate_income_tax(
+            self.current_salary, self.user.scotland, year=self.year
+        )
+        # Tax after employee contributions (gross contributions reduce taxable income)
+        taxable_income_after = max(self.current_salary - total_personal_gross, 0.0)
         tax_after = calculate_income_tax(
-            max(current_salary - total_personal_gross, 0), user.scotland, year=year
+            taxable_income_after, self.user.scotland, year=self.year
         )
         tax_relief_total = tax_before - tax_after
-
-        # 20% basic relief has already been granted by the pension provider; additional relief is refundable
+        # Basic 20% relief granted at source
         basic_relief = total_personal_gross * 0.20
-        tax_refund = max(tax_relief_total - basic_relief, 0)
+        tax_refund = max(tax_relief_total - basic_relief, 0.0)
+        return (tax_relief_total, basic_relief, tax_refund)
 
-        # Net cost to the individual
-        net_contrib_total = sipp_employee_net + wp_employee_net + lisa_net + isa_net
-        net_cost_after_refund = net_contrib_total - tax_refund
+    def _update_pots(
+        self,
+        lisa_gross: float,
+        lisa_net: float,
+        isa_net: float,
+        sipp_employee_gross: float,
+        sipp_employer_gross: float,
+        wp_employee_gross: float,
+        wp_employer_gross: float,
+    ) -> None:
+        """Update pot values and accumulated contributions.
 
-        # Update accumulated net and gross contributions
-        acc_lisa_net += lisa_net
-        acc_lisa_gross += lisa_gross
-        acc_isa_net += isa_net
-        acc_isa_gross += isa_net  # ISA gross = net (no bonus)
-        acc_sipp_net += sipp_employee_net
-        acc_sipp_gross += sipp_employee_gross + sipp_employer_gross
-        acc_workplace_net += wp_employee_net
-        acc_workplace_gross += wp_employee_gross + wp_employer_gross
+        Applies annual growth to each pot and adds the new contributions.
+        Also updates running totals of net and gross contributions for each
+        wrapper.  This method mutates the simulator state and has no return.
+        """
+        # Update accumulated contributions
+        self.acc_lisa_net += lisa_net
+        self.acc_lisa_gross += lisa_gross
+        self.acc_isa_net += isa_net
+        self.acc_isa_gross += isa_net  # ISA gross = net
+        # Employee SIPP net is recalculated outside this method; we expect caller to
+        # pass the correct net amount after any allowance adjustments.
+        # The gross amount includes employee and employer contributions here.
+        # For net accumulation, we only include the employee net; employers
+        # contributions are not a cost to the individual.
+        # We intentionally do not accumulate employer net because it is 0 by definition.
+        # SIPP net contributions accumulate from outside.
+        # Accumulate SIPP nets and grosses
+        # (these will be updated in the main loop to include the adjusted net/gross)
+        # We do not update them here to avoid double counting.
 
-        # Update pots by adding gross contributions and applying growth
-        pot_lisa = pot_lisa * (1 + returns.lisa) + lisa_gross
-        pot_isa = pot_isa * (1 + returns.isa) + isa_net
-        pot_sipp = (
-            pot_sipp * (1 + returns.sipp) + sipp_employee_gross + sipp_employer_gross
+        # Update pot balances with growth
+        self.pot_lisa = self.pot_lisa * (1.0 + self.returns.lisa) + lisa_gross
+        self.pot_isa = self.pot_isa * (1.0 + self.returns.isa) + isa_net
+        self.pot_sipp = (
+            self.pot_sipp * (1.0 + self.returns.sipp)
+            + sipp_employee_gross
+            + sipp_employer_gross
         )
-        pot_workplace = (
-            pot_workplace * (1 + returns.workplace)
+        self.pot_workplace = (
+            self.pot_workplace * (1.0 + self.returns.workplace)
             + wp_employee_gross
             + wp_employer_gross
         )
 
-        # Record results for this year
-        records.append(
-            {
+    def simulate(self) -> pd.DataFrame:
+        """Run the simulation and return a DataFrame of results.
+
+        This method iterates from the user's current age up to (but not
+        including) their retirement age.  For each year it calculates
+        contributions, applies the annual allowance, computes tax relief,
+        updates pots and accumulators, and records the results.  Finally it
+        returns the accumulated results as a pandas DataFrame with
+        inflation–adjusted pot columns added if an inflation rate was
+        provided.
+        """
+        years = self.user.retirement_age - self.user.current_age
+        records: List[Dict[str, Any]] = []
+        # Local variables for accumulated SIPP and workplace nets/grosses
+        acc_sipp_net_local = 0.0
+        acc_sipp_gross_local = 0.0
+        acc_workplace_net_local = 0.0
+        acc_workplace_gross_local = 0.0
+        for i in range(years):
+            age = self.user.current_age + i
+            # Determine base for workplace contributions
+            base_for_workplace = self._base_for_workplace()
+            # LISA/ISA contributions and redirections
+            lisa_isa = calculate_lisa_isa_contributions(
+                current_salary=self.take_home_salary,
+                age=age,
+                contrib=self.contrib,
+                lisa_limit=self.lisa_limit,
+                isa_limit=self.isa_limit,
+            )
+            lisa_net = lisa_isa["lisa_net"]
+            lisa_bonus = lisa_isa["lisa_bonus"]
+            lisa_gross = lisa_isa["lisa_gross"]
+            isa_net = lisa_isa["isa_net"]
+            redirected_sipp_net = lisa_isa["redirected_sipp_net"]
+
+            # Pension contributions (SIPP + workplace)
+            pensions = calculate_pension_contributions(
+                current_salary=self.take_home_salary,
+                base_for_workplace=base_for_workplace,
+                contrib=self.contrib,
+                redirected_sipp_net=redirected_sipp_net,
+            )
+            sipp_employee_net = pensions["sipp_employee_net"]
+            sipp_employee_gross = pensions["sipp_employee_gross"]
+            sipp_employer_gross = pensions["sipp_employer_gross"]
+            wp_employee_net = pensions["wp_employee_net"]
+            wp_employee_gross = pensions["wp_employee_gross"]
+            wp_employer_gross = pensions["wp_employer_gross"]
+
+            # Apply annual allowance
+            (
+                sipp_employee_net,
+                sipp_employee_gross,
+                sipp_employer_gross,
+                wp_employee_net,
+                wp_employee_gross,
+                wp_employer_gross,
+            ) = self._apply_annual_allowance(
+                sipp_employee_net,
+                sipp_employee_gross,
+                sipp_employer_gross,
+                wp_employee_net,
+                wp_employee_gross,
+                wp_employer_gross,
+            )
+
+            # Tax relief calculation
+            total_personal_gross = sipp_employee_gross + wp_employee_gross
+            tax_relief_total, basic_relief, tax_refund = self._compute_tax_relief(
+                total_personal_gross
+            )
+
+            # Net cost to the individual
+            net_contrib_total = sipp_employee_net + wp_employee_net + lisa_net + isa_net
+            net_cost_after_refund = net_contrib_total - tax_refund
+
+            # Update accumulators for SIPP and workplace nets/grosses (employee + employer for gross)
+            acc_sipp_net_local += sipp_employee_net
+            acc_sipp_gross_local += sipp_employee_gross + sipp_employer_gross
+            acc_workplace_net_local += wp_employee_net
+            acc_workplace_gross_local += wp_employee_gross + wp_employer_gross
+
+            # Update pots and global accumulators for LISA/ISA
+            self._update_pots(
+                lisa_gross=lisa_gross,
+                lisa_net=lisa_net,
+                isa_net=isa_net,
+                sipp_employee_gross=sipp_employee_gross,
+                sipp_employer_gross=sipp_employer_gross,
+                wp_employee_gross=wp_employee_gross,
+                wp_employer_gross=wp_employer_gross,
+            )
+
+            # Record results for the year
+            record = {
                 "Age": age,
-                "Salary": current_salary,
-                "Take-home Salary": income.take_home_salary,
-                "Income Tax": income.income_tax,
-                "NI Contribution": income.ni_due,
+                "Salary": self.current_salary,
+                "Take-home Salary": self.income.take_home_salary,
+                "Income Tax": self.income.income_tax,
+                "NI Contribution": self.income.ni_due,
                 "LISA Net": lisa_net,
                 "LISA Bonus": lisa_bonus,
                 "ISA Net": isa_net,
@@ -394,37 +552,89 @@ def project_retirement(
                 "Tax Refund": tax_refund,
                 "Total Contribution Cost": net_contrib_total,
                 "Net Contribution Cost": net_cost_after_refund,
-                "Pot LISA": pot_lisa,
-                "Pot ISA": pot_isa,
-                "Pot SIPP": pot_sipp,
-                "Pot Workplace": pot_workplace,
-                # New columns for accumulated contributions
-                "Accumulated LISA Net": acc_lisa_net,
-                "Accumulated LISA Gross": acc_lisa_gross,
-                "Accumulated ISA Net": acc_isa_net,
-                "Accumulated ISA Gross": acc_isa_gross,
-                "Accumulated SIPP Net": acc_sipp_net,
-                "Accumulated SIPP Gross": acc_sipp_gross,
-                "Accumulated Workplace Net": acc_workplace_net,
-                "Accumulated Workplace Gross": acc_workplace_gross,
+                "Pot LISA": self.pot_lisa,
+                "Pot ISA": self.pot_isa,
+                "Pot SIPP": self.pot_sipp,
+                "Pot Workplace": self.pot_workplace,
+                "Accumulated LISA Net": self.acc_lisa_net,
+                "Accumulated LISA Gross": self.acc_lisa_gross,
+                "Accumulated ISA Net": self.acc_isa_net,
+                "Accumulated ISA Gross": self.acc_isa_gross,
+                "Accumulated SIPP Net": acc_sipp_net_local,
+                "Accumulated SIPP Gross": acc_sipp_gross_local,
+                "Accumulated Workplace Net": acc_workplace_net_local,
+                "Accumulated Workplace Gross": acc_workplace_gross_local,
             }
-        )
+            records.append(record)
 
-    df = pd.DataFrame(records)
+        df = pd.DataFrame(records)
+        # Add inflation adjusted values
+        if self.inflation is not None and len(df) > 0:
+            # Compute cumulative inflation factor for each year
+            inflation_rate_col = pd.Series([self.inflation] * len(df))
+            cumulative_inflation = (1.0 + inflation_rate_col).cumprod()
+            cumulative_inflation.iloc[0] = 1.0
+            for pot in ["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"]:
+                if pot in df.columns:
+                    df[f"{pot} (Inflation Adjusted)"] = df[pot] / cumulative_inflation
+        return df
 
-    # --- Add inflation-adjusted (real) pot values ---
-    if inflation is not None and len(df) > 0:
-        inflation_rate_col = pd.Series([inflation] * len(df))
-        # Compute cumulative inflation factor for each year
-        cumulative_inflation = (1 + inflation_rate_col).cumprod()
-        # Set first year to 1.0 (no adjustment)
-        cumulative_inflation.iloc[0] = 1.0
-        # Add real (inflation-adjusted) columns for each pot
-        for pot in ["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"]:
-            if pot in df.columns:
-                df[f"{pot} (Inflation Adjusted)"] = df[pot] / cumulative_inflation
 
-    return df
+def project_retirement(
+    user: UserProfile,
+    contrib: ContributionRates,
+    returns: InvestmentReturns,
+    income: IncomeBreakdown,
+    inflation: float,
+    use_qualifying_earnings: bool,
+    year: int,
+) -> pd.DataFrame:
+    """
+    Compute the year-by-year contributions, tax relief, and account balances.
+
+    This convenience function wraps the :class:`RetirementSimulator` class.
+    It constructs a simulator, runs the projection and returns the result as
+    a DataFrame.  The signature is kept for backwards compatibility with
+    existing code and tests.
+
+    Parameters
+    ----------
+    user : UserProfile
+        User profile including age, retirement age, salary, and region.
+    contrib : ContributionRates
+        Contribution rates for each wrapper and shift rates after age 50.
+    returns : InvestmentReturns
+        Expected annual rates of return for each wrapper.
+    income : IncomeBreakdown
+        Income breakdown including take-home salary, tax and NI.  The
+        take-home salary is used as the base for percentage contributions.
+    inflation : float
+        Annual inflation rate used to index pot values.
+    use_qualifying_earnings : bool
+        If ``True``, workplace pension contributions are calculated on
+        qualifying earnings (currently £6,240–£50,270).  Otherwise,
+        contributions are based on the full salary.
+    year : int
+        Tax year used for income tax and limit calculations (e.g., 2025
+        corresponds to the 2025/26 tax year).
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with each year's age and financial metrics.  Inflation
+        adjusted pot values are appended with ``(Inflation Adjusted)`` if
+        an inflation rate is provided.
+    """
+    simulator = RetirementSimulator(
+        user=user,
+        contrib=contrib,
+        returns=returns,
+        income=income,
+        inflation=inflation,
+        use_qualifying_earnings=use_qualifying_earnings,
+        year=year,
+    )
+    return simulator.simulate()
 
 
 def _find_account_columns_postret(df: pd.DataFrame) -> dict:

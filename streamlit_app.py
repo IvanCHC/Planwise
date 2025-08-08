@@ -232,17 +232,43 @@ def contribution_rates_section(
     -------
     Tuple
         A tuple containing (in order):
-        - `lisa_rate`: fraction of salary contributed to LISA.
-        - `isa_rate`: fraction of salary contributed to ISA (after LISA).
-        - `sipp_employee_rate`: employee contribution to SIPP (salary %).
-        - `sipp_employer_rate`: employer contribution to SIPP (salary %).
-        - `workplace_employee_rate`: employee contribution to workplace pension.
-        - `workplace_employer_rate`: employer contribution to workplace pension.
-        - `unused_allowance`: remaining pension annual allowance after all contributions.
-        - `unused_salary`: remaining take‑home salary not allocated to ISA/LISA/pensions.
-        - `total_lisa`: actual pound amount contributed to LISA (salary × rate).
-        - `total_contrib_rate`: combined contribution rate used to display a progress
-          bar in the sidebar.
+
+        - ``lisa_rate``: Fraction of **take‑home salary** contributed to the Lifetime ISA.  The slider and
+          subsequent calculations in this function treat the input ``salary`` argument as
+          take‑home pay (after tax and NI).  This avoids confusing the user with gross vs net
+          percentages.
+
+        - ``isa_rate``: Fraction of take‑home salary contributed to the Stocks & Shares ISA (after LISA
+          contributions).
+
+        - ``sipp_employee_rate``: Employee contribution to the Self‑Invested Personal Pension (SIPP) as a
+          fraction of take‑home salary.  Contributions to a SIPP receive 20 % basic rate tax
+          relief at source, so the net cost to the individual is 80 % of this gross
+          contribution.
+
+        - ``sipp_employer_rate``: Employer contribution to the SIPP as a fraction of take‑home salary.  Employer
+          contributions count toward the pension annual allowance but do not reduce take‑home pay.
+
+        - ``workplace_employee_rate``: Employee contribution to the workplace pension scheme (defined
+          contribution) as a fraction of take‑home salary.
+
+        - ``workplace_employer_rate``: Employer contribution to the workplace pension scheme.  Like the SIPP
+          employer contribution, this counts toward the annual allowance but does not reduce
+          take‑home pay.
+
+        - ``unused_allowance``: Remaining annual pension allowance after all employer and employee
+          contributions.  If this value is zero or negative, no further pension contributions
+          can be made without incurring a tax charge.
+
+        - ``unused_salary``: Remaining take‑home salary after all selected contributions.  This helps
+          enforce that the sum of contribution percentages does not exceed 100 % of take‑home
+          pay.
+
+        - ``total_lisa``: Actual pound amount contributed to the LISA (take‑home salary × ``lisa_rate``).
+
+        - ``total_contrib_rate``: Combined contribution rate used to display the progress bar in the
+          sidebar.  This sum reflects the employee’s net outflow as a fraction of take‑home
+          salary.
     """
     with st.sidebar.expander(
         "Contribution rates (as % of take home salary)", expanded=False
@@ -927,6 +953,9 @@ def main() -> None:
     ) = sidebar_inputs()
 
     try:
+        # Run the pre‑retirement projection once.  This DataFrame will feed
+        # the visualisations and summary metrics.  Keep it outside of the
+        # tab contexts to avoid unnecessary recomputation when switching tabs.
         df = pw.project_retirement(
             user=user,
             contrib=contrib,
@@ -937,27 +966,38 @@ def main() -> None:
             year=tax_year,
         )
 
-        final_row, total_final = show_summary_metrics(df)
-        show_salary_and_contribution_breakdown(income, df)
-        show_final_breakdown(final_row, total_final)
-        show_data_table(df)
-        show_visualizations(df)
-        show_download(df, current_age, retirement_age)
+        # Create top‑level tabs for pre‑ and post‑retirement analysis.  This
+        # organisation improves navigation and keeps the UI from becoming
+        # cluttered when exploring different aspects of the model.
+        pre_tab, post_tab = st.tabs([
+            "Pre‑Retirement Analysis",
+            "Post‑Retirement Analysis",
+        ])
 
-        # --- Post-retirement projection section ---
-        post_retirement_projection_section(
-            pre_retirement_df=df,
-            returns=returns,
-            inflation=inflation,
-            retirement_age=retirement_age,
-            state_pension_age=state_pension_age,
-            state_pension_amount=state_pension_amount,
-        )
+        with pre_tab:
+            final_row, total_final = show_summary_metrics(df)
+            show_salary_and_contribution_breakdown(income, df)
+            show_final_breakdown(final_row, total_final)
+            show_data_table(df)
+            show_visualizations(df)
+            show_download(df, current_age, retirement_age)
+
+        with post_tab:
+            post_retirement_projection_section(
+                pre_retirement_df=df,
+                returns=returns,
+                inflation=inflation,
+                retirement_age=retirement_age,
+                state_pension_age=state_pension_age,
+                state_pension_amount=state_pension_amount,
+            )
 
     except Exception as e:
         st.error(f"Error running projection: {e}")
         st.error("Please check your input parameters and try again.")
 
+    # Always show the sidebar footer after the main content.  Placing this
+    # outside the try/except ensures it appears even if an error occurs.
     show_sidebar_footer()
 
 

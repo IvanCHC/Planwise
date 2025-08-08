@@ -2,6 +2,14 @@
 
 Welcome to the Planwise documentation! This library helps you model retirement savings across various UK tax wrappers.
 
+:::info
+**Python Version Compatibility**
+
+Planwise is tested on Python 3.11 and later.  Earlier Python versions (e.g., 3.8–3.10) are
+not officially supported, although individual modules may still work.  Make sure your
+environment is using Python 3.11+ before installing the package.
+:::
+
 ## Quick Start
 
 ```python
@@ -62,6 +70,51 @@ Main function for projecting retirement savings across multiple tax wrappers.
 
 **Returns:**
 - `pd.DataFrame`: Year-by-year projection results
+
+#### `RetirementSimulator`
+
+While the :func:`project_retirement` convenience function remains available for
+backwards compatibility, the underlying projection logic is encapsulated in
+the :class:`planwise.core.RetirementSimulator` class.  This class stores
+the input parameters and internal state and exposes a :meth:`simulate`
+method that returns a ``DataFrame`` identical to the result from
+``project_retirement``.  Using the class directly makes it easier to
+understand and modify intermediate steps, since the year–by–year logic is
+organized into small helper methods rather than a single monolithic
+function.
+
+Example:
+
+```python
+from planwise.core import UserProfile, ContributionRates, InvestmentReturns, IncomeBreakdown, RetirementSimulator
+
+# Define inputs as usual
+user = UserProfile(current_age=30, retirement_age=67, salary=40000, scotland=False)
+contrib = ContributionRates(lisa=0.05, isa=0.05, sipp_employee=0.05, sipp_employer=0.0,
+                            workplace_employee=0.05, workplace_employer=0.03,
+                            shift_lisa_to_isa=0.5, shift_lisa_to_sipp=0.5)
+returns = InvestmentReturns(lisa=0.05, isa=0.05, sipp=0.05, workplace=0.05)
+income = IncomeBreakdown(salary=user.salary, take_home_salary=user.salary, income_tax=0.0, ni_due=0.0)
+
+# Instantiate the simulator and run the projection
+simulator = RetirementSimulator(
+    user=user,
+    contrib=contrib,
+    returns=returns,
+    income=income,
+    inflation=0.02,
+    use_qualifying_earnings=True,
+    year=2025,
+)
+results = simulator.simulate()
+print(results.head())
+```
+
+Internally, the simulator breaks the calculations into helper methods that
+compute the base for workplace contributions, apply the pension annual
+allowance, calculate tax relief and update pots.  This design makes it
+easier to extend or override specific behaviours without rewriting the
+entire projection loop.
 
 #### `UserProfile`
 
@@ -157,7 +210,17 @@ Create contribution breakdown chart.
 
 #### `make_growth_plot(df, title=None)`
 
-Create pot growth chart.
+Create a line chart showing the nominal pot values for each account and, where
+available, the cumulative net contributions over time.  Solid lines represent
+the pots’ nominal values while dashed lines represent the accumulated net
+contributions into each wrapper.  If the DataFrame passed to this function
+lacks the pre‑computed ``Accumulated <Account> Net`` columns (for example,
+when using custom sample data in tests), the cumulative net contributions
+are computed on the fly from the yearly net contribution columns (e.g.,
+``LISA Net``, ``ISA Net``).  The function always returns a single Altair
+``Chart`` with a top‑level ``mark`` of type ``line``, ensuring that the
+resulting chart can be further composed or inspected without the complexity
+of layered specifications.
 
 #### `make_combined_plot(df)`
 
