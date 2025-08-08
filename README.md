@@ -78,11 +78,47 @@ print(results.head())
 
 ### Command Line Interface
 
+The `planwise` command provides a quick, non‑interactive way to generate a
+retirement projection from the terminal.  Contribution rates are expressed as
+fractions of your *take‑home salary* (gross salary minus income tax and
+National Insurance).  The CLI automatically computes income tax and NI
+deductions based on the selected tax year and region (Scottish or rest of
+UK) before applying your contribution percentages.  This mirrors the
+behaviour of the Streamlit app and ensures that allowance checks (LISA
+limits, ISA allowance and pension annual allowance) are applied on the same
+net basis.
+
+Key options include:
+
+| Option | Description |
+|-------|-------------|
+| `--current-age` | Current age of the individual (default: 30) |
+| `--retirement-age` | Age at which saving stops and projection ends (default: 67) |
+| `--salary` | Gross annual salary in pounds (required) |
+| `--lisa-rate` | Fraction of take‑home pay contributed to a Lifetime ISA (default: 0.05) |
+| `--isa-rate` | Fraction of take‑home pay contributed to a Stocks & Shares ISA (default: 0.05) |
+| `--sipp-employee-rate` | Employee contribution to a Self‑Invested Personal Pension as a fraction of take‑home pay (default: 0.05) |
+| `--sipp-employer-rate` | Employer contribution to a SIPP as a fraction of take‑home pay (default: 0.0) |
+| `--workplace-employee-rate` | Employee contribution to the workplace pension (default: 0.05) |
+| `--workplace-employer-rate` | Employer contribution to the workplace pension (default: 0.03) |
+| `--shift-lisa-to-isa` | After age 50, fraction of the former LISA contribution redirected to the ISA (default: 0.5) |
+| `--shift-lisa-to-sipp` | After age 50, fraction of the former LISA contribution redirected to the SIPP (default: 0.5) |
+| `--roi-*` | Expected annual return for each wrapper (`--roi-lisa`, `--roi-isa`, `--roi-sipp`, `--roi-workplace`; default 0.05) |
+| `--inflation` | Annual inflation assumption (default: 0.02) |
+| `--scotland` | Use Scottish income tax bands instead of rest‑of‑UK |
+| `--use-qualifying-earnings` | Calculate workplace contributions on qualifying earnings instead of full salary |
+| `--tax-year` | Tax year used for allowances and tax bands (default: latest available) |
+| `--summary` | Display a concise summary of the final pot values rather than the full table |
+| `--output` | Path to write the full results as a CSV file |
+| `--config` | Load CLI arguments from a JSON configuration file (keys match the long‑form flag names without dashes) |
+
+#### Examples
+
 ```bash
-# Basic projection
+# Basic projection using defaults (prints full table)
 planwise --current-age 30 --retirement-age 67 --salary 40000
 
-# With custom rates and summary
+# With custom rates and a summary of the final pots
 planwise \
   --current-age 30 \
   --retirement-age 67 \
@@ -92,23 +128,40 @@ planwise \
   --sipp-employee-rate 0.05 \
   --summary
 
-# Save results to CSV
+# Save results to CSV for further analysis
 planwise \
   --current-age 30 \
   --retirement-age 67 \
   --salary 40000 \
   --output results.csv
 
-# Use Scottish tax bands
+# Use Scottish tax bands and display a summary
 planwise \
   --current-age 30 \
   --retirement-age 67 \
   --salary 40000 \
   --scotland \
   --summary
+
+# Load parameters from a JSON file (overrides CLI flags)
+planwise --config params.json --summary
 ```
 
 ### Plotting
+The plotting functions in Planwise depend on the optional
+Altair and Plotly libraries.  They are not installed by default when you
+install Planwise.  To enable the plotting API, install the optional
+dependencies:
+
+```bash
+pip install "planwise[plotting]"
+
+# or for the Streamlit app (includes plotting support)
+pip install "planwise[app]"
+```
+
+If you attempt to import or call plotting functions without these
+dependencies installed you will receive an informative error message.
 
 The preferred way to build charts from your projection results is via the
 ``RetirementPlotter`` class in the :mod:`planwise.plotting` module.  Create

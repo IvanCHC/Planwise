@@ -20,6 +20,10 @@ from .core import (
     UserProfile,
     project_retirement,
 )
+from .ni import calculate_ni
+
+# Import tax and NI calculators so the CLI can compute take‑home pay.
+from .tax import calculate_income_tax
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -228,17 +232,46 @@ def print_summary(df: pd.DataFrame) -> None:
 def main() -> None:
     """
     Main CLI entry point for Planwise.
-    Parses arguments, runs the projection, and outputs results.
+
+    This function parses command‑line arguments, optionally merges values from a
+    JSON configuration file, constructs the necessary dataclasses, computes a
+    realistic take‑home salary based on UK income tax and National Insurance
+    rules, and runs the retirement projection.  Results can be written to a
+    CSV file, displayed in full or summarised.
+
+    Unlike earlier versions of the CLI, contributions are now interpreted as
+    fractions of *take‑home* salary rather than gross salary, mirroring the
+    behaviour of the Streamlit application.  The CLI automatically
+    calculates the employee's income tax and NI contributions based on the
+    selected tax year and region (Scottish or rest of UK).  This ensures
+    that contribution rates and allowance checks are applied consistently with
+    the interactive app.
     """
     parser = create_parser()
     args = parser.parse_args()
 
-    # Optionally load config file and override args
+    # Optionally load config file and override args.  Keys in the JSON
+    # configuration should use the same long‑form names as CLI flags (without
+    # leading dashes).  Unknown keys are ignored.
     if args.config:
         config = load_config(args.config)
         for key, value in config.items():
-            if hasattr(args, key.replace("-", "_")):
-                setattr(args, key.replace("-", "_"), value)
+            attr = key.replace("-", "_")
+            if hasattr(args, attr):
+                setattr(args, attr, value)
+
+    # Compute income tax and NI to derive take‑home salary.  Both functions
+    # accept the tax year and region; NI defaults to category A.  Use a
+    # try/except so that any unexpected errors result in a friendly message.
+    try:
+        ni_due = calculate_ni(args.salary, year=args.tax_year, category="category_a")
+        income_tax = calculate_income_tax(
+            args.salary, scotland=args.scotland, year=args.tax_year
+        )
+        take_home_salary = args.salary - ni_due - income_tax
+    except Exception as e:
+        print(f"Error computing tax or NI: {e}")
+        sys.exit(1)
 
     # Prepare user, contribution, and return dataclasses
     user = UserProfile(
@@ -264,15 +297,18 @@ def main() -> None:
         workplace=args.roi_workplace,
     )
 
-    # Prepare a dummy IncomeBreakdown (not used in CLI projections)
+    # Construct the IncomeBreakdown with actual tax and NI.  Import here to
+    # avoid circular imports at module load time.
     from .core import IncomeBreakdown
 
     income = IncomeBreakdown(
         salary=args.salary,
-        take_home_salary=args.salary,  # Placeholder
-        income_tax=0.0,  # Placeholder
-        ni_due=0.0,  # Placeholder
+        take_home_salary=take_home_salary,
+        income_tax=income_tax,
+        ni_due=ni_due,
     )
+
+    # Run the projection
     try:
         df = project_retirement(
             user=user,
