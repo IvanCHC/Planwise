@@ -412,3 +412,142 @@ def project_retirement(
                 df[f"{pot} (Inflation Adjusted)"] = df[pot] / cumulative_inflation
 
     return df
+
+
+def _find_account_columns_postret(df: pd.DataFrame) -> dict:
+    account_map = {}
+    for col in df.columns:
+        if col.startswith("Pot ") and not col.endswith("(Inflation Adjusted)"):
+            acc_name = col[len("Pot ") :].strip()
+            account_map[acc_name] = col
+    return account_map
+
+
+def _returns_to_dict_postret(returns: InvestmentReturns) -> dict:
+    return {
+        "LISA": getattr(returns, "lisa", 0.0),
+        "ISA": getattr(returns, "isa", 0.0),
+        "SIPP": getattr(returns, "sipp", 0.0),
+        "Workplace": getattr(returns, "workplace", 0.0),
+    }
+
+
+def project_post_retirement(
+    df: pd.DataFrame,
+    withdrawal_today: float,
+    returns: InvestmentReturns,
+    withdraw_plan: list,
+    inflation: float = 0.02,
+    end_age: int = 100,
+) -> pd.DataFrame:
+    """
+    Project post-retirement account balances and withdrawals using a drawdown strategy.
+
+    Args:
+        df (pd.DataFrame): DataFrame of historical pots (must include 'Age' and 'Pot <Account>' columns).
+        withdrawal_today (float): Annual withdrawal in today's money.
+        returns (InvestmentReturns): Expected annual rates of return for each account.
+        withdraw_plan (list): List of dicts specifying withdrawal order and eligibility.
+        inflation (float, optional): Annual inflation rate. Default is 0.02.
+        end_age (int, optional): Final age for projection. Default is 100.
+
+    Returns:
+        pd.DataFrame: DataFrame with projected balances, withdrawals, and shortfall per year.
+    """
+    if df.empty:
+        raise ValueError("Input data frame must not be empty.")
+    if "Age" not in df.columns:
+        raise ValueError("Input data frame must contain an 'Age' column.")
+
+    df_sorted = df.sort_values("Age")
+    current_age = int(df_sorted["Age"].iloc[-1])
+    account_columns = _find_account_columns_postret(df_sorted)
+    starting_pots = {
+        acc: float(df_sorted[col].iloc[-1]) for acc, col in account_columns.items()
+    }
+    account_rois = _returns_to_dict_postret(returns)
+
+    # Preprocess withdrawal plan
+    plan = []
+    for entry in withdraw_plan:
+        if "account" not in entry or "start_age" not in entry:
+            raise ValueError(
+                "Each withdraw_plan entry must include both 'account' and 'start_age'."
+            )
+        acc = entry["account"]
+        if acc not in starting_pots:
+            raise ValueError(
+                f"Account '{acc}' in withdraw_plan not found in input data."
+            )
+        plan.append(
+            {
+                "account": acc,
+                "start_age": int(entry["start_age"]),
+                "proportion": entry.get("proportion", None),
+            }
+        )
+
+    records = []
+    pots = starting_pots.copy()
+    cumulative_inflation = 1.0
+    for age in range(current_age + 1, end_age + 1):
+        # Apply growth
+        for acc, value in pots.items():
+            growth_rate = account_rois.get(acc, 0.0)
+            pots[acc] = value * (1.0 + growth_rate)
+
+        cumulative_inflation *= 1.0 + inflation
+        nominal_withdrawal = withdrawal_today * cumulative_inflation
+        remaining_withdrawal = nominal_withdrawal
+        shortfall = 0.0
+
+        active_plan = [p for p in plan if age >= p["start_age"]]
+        total_prop = sum(
+            p["proportion"] for p in active_plan if p["proportion"] is not None
+        )
+        # Proportional withdrawals
+        if total_prop > 1.0:
+            raise ValueError(
+                f"Sum of proportions in withdraw_plan entries active at age {age} exceeds 1."
+            )
+        if total_prop > 0.0:
+            for p in active_plan:
+                proportion = p["proportion"]
+                acc = p["account"]
+                if proportion is not None:
+                    alloc = nominal_withdrawal * proportion
+                    taken = min(alloc, pots[acc])
+                    pots[acc] -= taken
+                    remaining_withdrawal -= taken
+        # Sequential withdrawals
+        if remaining_withdrawal > 1e-9:
+            for p in active_plan:
+                if p["proportion"] is not None:
+                    continue
+                acc = p["account"]
+                if pots[acc] > 0.0:
+                    taken = min(remaining_withdrawal, pots[acc])
+                    pots[acc] -= taken
+                    remaining_withdrawal -= taken
+                    if remaining_withdrawal <= 1e-9:
+                        break
+        if remaining_withdrawal > 1e-9:
+            shortfall = remaining_withdrawal
+
+        total_pot = sum(pots.values())
+        total_pot_real = total_pot / cumulative_inflation
+
+        record = {
+            "Age": age,
+            "Nominal Withdrawal": nominal_withdrawal,
+            "Real Withdrawal": withdrawal_today,
+        }
+        for acc, value in pots.items():
+            record[f"Pot {acc}"] = value
+        record["Total Pot"] = total_pot
+        record["Total Pot Real"] = total_pot_real
+        record["Remaining Withdrawal Shortfall"] = shortfall
+        records.append(record)
+
+    result_df = pd.DataFrame(records)
+    return result_df

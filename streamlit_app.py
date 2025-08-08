@@ -907,11 +907,116 @@ def main() -> None:
         show_visualizations(df)
         show_download(df, current_age, retirement_age)
 
+        # --- Post-retirement projection section ---
+        post_retirement_projection_section(
+            pre_retirement_df=df,
+            returns=returns,
+            inflation=inflation,
+            retirement_age=retirement_age,
+        )
+
     except Exception as e:
         st.error(f"Error running projection: {e}")
         st.error("Please check your input parameters and try again.")
 
     show_sidebar_footer()
+
+
+def post_retirement_projection_section(
+    pre_retirement_df: pd.DataFrame,
+    returns: "pw.core.InvestmentReturns",
+    inflation: float,
+    retirement_age: int,
+    st_container: None = None,
+) -> pd.DataFrame:
+    """
+    Run and display post-retirement projection using project_post_retirement.
+    Args:
+        pre_retirement_df: DataFrame with pre-retirement pots (must include 'Age' and 'Pot <Account>' columns)
+        returns: InvestmentReturns dataclass
+        inflation: float, annual inflation rate
+        retirement_age: int, starting age for post-retirement
+        st_container: Optional Streamlit container to render output
+    Returns:
+        pd.DataFrame: The post-retirement projection DataFrame
+    """
+
+    # --- Move all configuration to sidebar ---
+    with st.sidebar.expander("Post-Retirement Settings", expanded=False):
+        withdrawal_today = st.number_input(
+            "Annual withdrawal in today's money (£)",
+            min_value=0.0,
+            value=30000.0,
+            step=1000.0,
+            help="How much you want to withdraw per year in today's money.",
+            key="postret_withdrawal_today",
+        )
+
+        # Default withdrawal plan: deplete SIPP/Workplace first, then ISA, then LISA
+        available_accounts = [
+            acc
+            for acc in ["SIPP", "Workplace", "ISA", "LISA"]
+            if f"Pot {acc}" in pre_retirement_df.columns
+        ]
+        default_plan = []
+        for acc in available_accounts:
+            if acc == "LISA":
+                start_age = retirement_age
+                min_age = 60
+            elif acc in ("SIPP", "Workplace"):
+                start_age = retirement_age
+                min_age = min(55, retirement_age)
+            elif acc == "ISA":
+                start_age = retirement_age
+                min_age = 0
+            default_plan.append(
+                {"account": acc, "start_age": start_age, "min_age": min_age}
+            )
+
+        st.write("**Withdrawal order and eligibility:**")
+        plan = []
+        for entry in default_plan:
+            start_age = int(
+                st.number_input(
+                    f"Start age for {acc}",
+                    min_value=entry["min_age"],
+                    max_value=100,
+                    value=entry["start_age"],
+                    step=1,
+                    key=f"withdraw_start_{str(entry['account'])}",
+                )
+            )
+            plan.append({"account": acc, "start_age": start_age})
+
+    stc = st_container or st
+    stc.subheader("Post-Retirement Projection")
+
+    # Run projection
+    post_df = pw.core.project_post_retirement(
+        pre_retirement_df,
+        withdrawal_today=withdrawal_today,
+        returns=returns,
+        withdraw_plan=plan,
+        inflation=inflation,
+        end_age=100,
+    )
+
+    with stc.expander("Show post-retirement projection table"):
+        st.dataframe(post_df, use_container_width=True)
+
+    col1, col2 = stc.columns(2)
+
+    # Left: total pot/withdrawal/shortfall plot
+    with col1:
+        fig = pw.plotting.plot_post_retirement_withdrawals(post_df)
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Right: plot each account's pot over time (now in plotting module)
+    with col2:
+        fig_accounts = pw.plotting.plot_postretirement_accounts(post_df)
+        st.plotly_chart(fig_accounts, use_container_width=True)
+
+    return post_df
 
 
 def show_salary_and_contribution_breakdown(

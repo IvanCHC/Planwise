@@ -1,3 +1,129 @@
+import pandas as pd
+import plotly.graph_objs as go
+
+
+def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
+    import plotly.graph_objs as go
+
+    fig = go.Figure()
+    account_cols = [
+        col
+        for col in df.columns
+        if col.startswith("Pot ")
+        and col
+        not in (
+            "Pot LISA (Inflation Adjusted)",
+            "Pot ISA (Inflation Adjusted)",
+            "Pot SIPP (Inflation Adjusted)",
+            "Pot Workplace (Inflation Adjusted)",
+        )
+    ]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+    for i, col in enumerate(account_cols):
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df[col],
+                mode="lines",
+                name=col.replace("Pot ", ""),
+                line=dict(color=colors[i % len(colors)], width=2),
+            )
+        )
+    fig.update_layout(
+        title="Account Pots Over Time",
+        xaxis=dict(title=dict(text="Age", font=dict(size=16)), tickfont=dict(size=14)),
+        yaxis=dict(
+            title=dict(text="Pot Value (£)", font=dict(size=16)), tickfont=dict(size=14)
+        ),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            font=dict(size=13),
+            orientation="v",
+        ),
+        template="plotly_white",
+        hovermode="x unified",
+        margin=dict(r=120),
+    )
+    return fig
+
+
+def plot_post_retirement_withdrawals(df: pd.DataFrame) -> go.Figure:
+    """
+    Plot post-retirement withdrawals and pot balances using Plotly.
+
+    Args:
+        df (pd.DataFrame): DataFrame from project_post_retirement, must include 'Age', 'Nominal Withdrawal', 'Total Pot', and 'Remaining Withdrawal Shortfall'.
+
+    Returns:
+        go.Figure: Plotly Figure object.
+    """
+    fig = go.Figure()
+
+    # Plot total pot
+    fig.add_trace(
+        go.Scatter(
+            x=df["Age"],
+            y=df["Total Pot"],
+            mode="lines",
+            name="Total Pot (Nominal)",
+            line=dict(color="royalblue", width=2),
+        )
+    )
+
+    # Plot nominal withdrawal
+    fig.add_trace(
+        go.Scatter(
+            x=df["Age"],
+            y=df["Nominal Withdrawal"],
+            mode="lines",
+            name="Nominal Withdrawal",
+            line=dict(color="orange", dash="dash"),
+        )
+    )
+
+    # Plot shortfall if any
+    if (
+        "Remaining Withdrawal Shortfall" in df.columns
+        and (df["Remaining Withdrawal Shortfall"] > 0).any()
+    ):
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Remaining Withdrawal Shortfall"],
+                mode="lines",
+                name="Withdrawal Shortfall",
+                line=dict(color="red", dash="dot"),
+            )
+        )
+
+    fig.update_layout(
+        title="Post-Retirement Withdrawals and Pot Balances",
+        xaxis=dict(
+            title=dict(text="Age", font=dict(size=16)),
+            tickfont=dict(size=14),
+        ),
+        yaxis=dict(
+            title=dict(text="Amount (£)", font=dict(size=16)),
+            tickfont=dict(size=14),
+        ),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            font=dict(size=13),
+            orientation="v",
+        ),
+        template="plotly_white",
+        hovermode="x unified",
+        margin=dict(r=120),
+    )
+    return fig
+
+
 """
 Plotting functions for visualizing retirement projections in Planwise.
 
