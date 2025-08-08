@@ -1,3 +1,4 @@
+import pandas as pd
 import plotly.graph_objs as go
 
 
@@ -127,10 +128,6 @@ def plot_postretirement_accounts_todays(df: pd.DataFrame) -> go.Figure:
             )
         )
     return fig
-
-
-import pandas as pd
-import plotly.graph_objs as go
 
 
 def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
