@@ -969,6 +969,9 @@ def post_retirement_projection_section(
             elif acc == "ISA":
                 start_age = retirement_age
                 min_age = 0
+            else:
+                start_age = int(retirement_age)
+                min_age = retirement_age
             default_plan.append(
                 {"account": acc, "start_age": start_age, "min_age": min_age}
             )
