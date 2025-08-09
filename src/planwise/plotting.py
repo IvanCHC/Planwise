@@ -422,15 +422,31 @@ def plot_post_retirement_withdrawals_todays(df: pd.DataFrame) -> go.Figure:
 
 
 def plot_postretirement_accounts_todays(df: pd.DataFrame) -> go.Figure:
-    """Plot post‑retirement account pots in today's money.
-
-    The pension pot is derived by summing the SIPP and workplace pots if both
-    are present; otherwise it falls back to whichever pot is available.  LISA
-    and ISA pots are plotted individually.  A state pension trace is added if
-    present.
-    """
+    """Plot post‑retirement account pots in today's money, including Pension Tax Free/Tax."""
     fig = go.Figure()
-    # Plot Pension (Today's Money)
+    # Pension Tax Free
+    if "Pot Pension Tax Free" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot Pension Tax Free"],
+                mode="lines",
+                name="Pension Tax Free (Today's Money)",
+                line=dict(color="#1f77b4", width=2, dash="solid"),
+            )
+        )
+    # Pension Tax
+    if "Pot Pension Tax" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot Pension Tax"],
+                mode="lines",
+                name="Pension Tax (Today's Money)",
+                line=dict(color="#1f77b4", width=2, dash="dash"),
+            )
+        )
+    # Plot SIPP and Workplace pots as Pension (Today's Money)
     if "Pot SIPP" in df.columns and "Pot Workplace" in df.columns:
         pension_todays = df["Pot SIPP"] + df["Pot Workplace"]
         fig.add_trace(
@@ -499,15 +515,30 @@ def plot_postretirement_accounts_todays(df: pd.DataFrame) -> go.Figure:
 
 
 def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
-    """Plot post‑retirement account pots over time.
-
-    This function produces a multi‑trace Plotly figure showing the values of
-    pension, LISA and ISA pots over time.  If a ``Pot Pension`` column is
-    available it is used directly; otherwise the pension pot is constructed by
-    summing the SIPP and workplace pots.  Optional state pension series are
-    added if present.
-    """
+    """Plot post‑retirement account pots over time, including Pension Tax Free/Tax."""
     fig = go.Figure()
+    # Pension Tax Free
+    if "Pot Pension Tax Free" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot Pension Tax Free"],
+                mode="lines",
+                name="Pension Tax Free",
+                line=dict(color="#1f77b4", width=2, dash="solid"),
+            )
+        )
+    # Pension Tax
+    if "Pot Pension Tax" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Pot Pension Tax"],
+                mode="lines",
+                name="Pension Tax",
+                line=dict(color="#1f77b4", width=2, dash="dash"),
+            )
+        )
     # Determine which account columns to plot
     account_cols: List[str] = []
     if "Pot Pension" in df.columns:
@@ -538,17 +569,6 @@ def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
                 line=dict(color=colors[i % len(colors)], width=2),
             )
         )
-    # Optionally plot state pension columns if present
-    if "State Pension (Inflation Adjusted)" in df.columns:
-        fig.add_trace(
-            go.Scatter(
-                x=df["Age"],
-                y=df["State Pension (Inflation Adjusted)"],
-                mode="lines",
-                name="State Pension (Inflation Adjusted)",
-                line=dict(color="#2ca02c", dash="dot", width=2),
-            )
-        )
     if "State Pension (Today's Money)" in df.columns:
         fig.add_trace(
             go.Scatter(
@@ -560,7 +580,7 @@ def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
             )
         )
     fig.update_layout(
-        title="Account Pots Over Time",
+        title="Account Pots Over Time (in Today's Money)",
         xaxis=dict(title=dict(text="Age", font=dict(size=16)), tickfont=dict(size=14)),
         yaxis=dict(
             title=dict(text="Pot Value (£)", font=dict(size=16)), tickfont=dict(size=14)
@@ -581,23 +601,7 @@ def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
 
 
 def plot_post_retirement_withdrawals(df: pd.DataFrame) -> go.Figure:
-    """Plot post‑retirement withdrawals and pot balances using Plotly.
-
-    Produces a figure with traces for the total pot (nominal and today's
-    money), withdrawals (inflation adjusted and today's money), any remaining
-    shortfall and optional state pension series.  Missing columns are ignored.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame from :func:`planwise.core.project_post_retirement`, must
-        include at minimum ``Age`` and ``Total Pot``.
-
-    Returns
-    -------
-    plotly.graph_objs.Figure
-        A multi‑trace Plotly figure.
-    """
+    """Plot post‑retirement withdrawals and pot balances using Plotly, including tax paid."""
     fig = go.Figure()
     # Plot total pot (nominal and today's money if available)
     if "Total Pot" in df.columns:
@@ -674,6 +678,28 @@ def plot_post_retirement_withdrawals(df: pd.DataFrame) -> go.Figure:
                 mode="lines",
                 name="State Pension (Today's Money)",
                 line=dict(color="#17becf", dash="dash", width=2),
+            )
+        )
+    # Plot Tax Paid on Withdrawals (Inflation Adjusted)
+    if "Tax Paid on Withdrawals (Inflation Adjusted)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Tax Paid on Withdrawals (Inflation Adjusted)"],
+                mode="lines",
+                name="Tax Paid on Withdrawals (Inflation Adjusted)",
+                line=dict(color="crimson", dash="dot"),
+            )
+        )
+    # Plot Tax Paid on Withdrawals (Today's Money)
+    if "Tax Paid on Withdrawals (Today's Money)" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=df["Tax Paid on Withdrawals (Today's Money)"],
+                mode="lines",
+                name="Tax Paid on Withdrawals (Today's Money)",
+                line=dict(color="crimson", dash="dash"),
             )
         )
     fig.update_layout(

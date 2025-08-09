@@ -1113,8 +1113,18 @@ def post_retirement_projection_section(
         current_age=current_age,
     )
 
-    # Combine SIPP and Workplace into Pension for all post-retirement calculations
-    if "Pot SIPP" in post_df.columns and "Pot Workplace" in post_df.columns:
+    # Combine pension-related pots into a single Pension column for display
+    # Support both pre- and post-tax split variants (Pension Tax Free/Tax) as well as legacy SIPP/Workplace columns.
+    if (
+        "Pot Pension Tax Free" in post_df.columns
+        and "Pot Pension Tax" in post_df.columns
+    ):
+        post_df["Pension"] = post_df["Pot Pension Tax Free"] + post_df["Pot Pension Tax"]
+    elif "Pot Pension Tax Free" in post_df.columns:
+        post_df["Pension"] = post_df["Pot Pension Tax Free"]
+    elif "Pot Pension Tax" in post_df.columns:
+        post_df["Pension"] = post_df["Pot Pension Tax"]
+    elif "Pot SIPP" in post_df.columns and "Pot Workplace" in post_df.columns:
         post_df["Pension"] = post_df["Pot SIPP"] + post_df["Pot Workplace"]
     elif "Pot SIPP" in post_df.columns:
         post_df["Pension"] = post_df["Pot SIPP"]

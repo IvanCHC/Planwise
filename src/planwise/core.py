@@ -670,6 +670,8 @@ def project_post_retirement(
     end_age: int = 100,
     current_age: int = 30,
     year: int = 2025,
+    scotland: bool = False,
+    pension_tax_free_fraction: float = 0.25,
 ) -> pd.DataFrame:
     """
     Project post-retirement account balances and withdrawals using a drawdown strategy.
@@ -693,7 +695,7 @@ def project_post_retirement(
     df_sorted = df.sort_values("Age")
     account_columns = _find_account_columns_postret(df_sorted)
     # Build starting pots, combining SIPP and Workplace into Pension
-    starting_pots = {}
+    starting_pots: Dict[str, float] = {}
     for acc, col in account_columns.items():
         if acc == "Pension":
             sipp = (
@@ -714,7 +716,6 @@ def project_post_retirement(
     if "Pension" in starting_pots:
         sipp_roi = getattr(returns, "sipp", 0.0)
         workplace_roi = getattr(returns, "workplace", 0.0)
-        # Use weighted average if both exist, else whichever exists
         sipp = (
             float(df_sorted["Pot SIPP"].iloc[-1])
             if "Pot SIPP" in df_sorted.columns
@@ -731,31 +732,93 @@ def project_post_retirement(
         else:
             pension_roi = max(sipp_roi, workplace_roi)
         account_rois["Pension"] = pension_roi
+        # remove SIPP and Workplace ROI entries, since they are combined
         account_rois.pop("SIPP", None)
         account_rois.pop("Workplace", None)
 
+    # --- Split Pension into tax-free and taxable accounts ---
+    # If a combined Pension pot exists, divide it into tax-free and tax portions.
+    # The default fraction of the pension that can be withdrawn tax-free (pension_tax_free_fraction)
+    # can be overridden via function parameter. This splitting occurs only at the start
+    # of the post-retirement projection and does not reallocate funds between the sub-accounts
+    # thereafter. Both sub-accounts earn the same ROI as the original Pension.
+    if "Pension" in starting_pots:
+        total_pension = starting_pots.pop("Pension")
+        total_pension = max(total_pension, 0.0)
+        tax_free_balance = min(
+            total_pension * pension_tax_free_fraction, 268275
+        )  # 2025/26 LTA
+        taxable_balance = total_pension - tax_free_balance
+        starting_pots["Pension Tax Free"] = tax_free_balance
+        starting_pots["Pension Tax"] = taxable_balance
+        pension_roi = account_rois.pop("Pension")
+        account_rois["Pension Tax Free"] = pension_roi
+        account_rois["Pension Tax"] = pension_roi
+
     # Preprocess withdrawal plan
-    plan = []
+    # Expand references to Pension (or SIPP/Workplace) into separate tax-free and taxable accounts
+    plan: List[Dict[str, Any]] = []
     for entry in withdraw_plan:
         if "account" not in entry or "start_age" not in entry:
             raise ValueError(
                 "Each withdraw_plan entry must include both 'account' and 'start_age'."
             )
-        acc = entry["account"]
-        # Map SIPP/Workplace to Pension for backward compatibility
-        if acc in ("SIPP", "Workplace") and "Pension" in starting_pots:
-            acc = "Pension"
-        if acc not in starting_pots:
-            raise ValueError(
-                f"Account '{acc}' in withdraw_plan not found in input data."
+        acc_original = entry["account"]
+        start_age = int(entry["start_age"])
+        proportion = entry.get("proportion", None)
+        # Determine if this entry targets the combined Pension or its components
+        if acc_original in ("Pension", "SIPP", "Workplace") and (
+            "Pension Tax Free" in starting_pots or "Pension Tax" in starting_pots
+        ):
+            # If a proportion is provided, allocate it between the tax-free and taxable pots
+            if proportion is not None:
+                prop_free = proportion * pension_tax_free_fraction
+                prop_tax = proportion * (1.0 - pension_tax_free_fraction)
+                if prop_free > 0.0:
+                    plan.append(
+                        {
+                            "account": "Pension Tax Free",
+                            "start_age": start_age,
+                            "proportion": prop_free,
+                        }
+                    )
+                if prop_tax > 0.0:
+                    plan.append(
+                        {
+                            "account": "Pension Tax",
+                            "start_age": start_age,
+                            "proportion": prop_tax,
+                        }
+                    )
+            else:
+                # Sequential withdrawals: add both sub-accounts without proportions
+                plan.append(
+                    {
+                        "account": "Pension Tax Free",
+                        "start_age": start_age,
+                        "proportion": None,
+                    }
+                )
+                plan.append(
+                    {
+                        "account": "Pension Tax",
+                        "start_age": start_age,
+                        "proportion": None,
+                    }
+                )
+        else:
+            acc = acc_original
+            if acc not in starting_pots:
+                raise ValueError(
+                    f"Account '{acc}' in withdraw_plan not found in input data."
+                )
+            plan.append(
+                {
+                    "account": acc,
+                    "start_age": start_age,
+                    "proportion": proportion,
+                }
             )
-        plan.append(
-            {
-                "account": acc,
-                "start_age": int(entry["start_age"]),
-                "proportion": entry.get("proportion", None),
-            }
-        )
 
     # --- State Pension Projection ---
     sp_data = STATE_PENSION_DB.get(str(year), {})
@@ -763,59 +826,22 @@ def project_post_retirement(
     state_pension_per_year = sp_data.get("state_pension_per_year", 11000.0)
     uprate_inflation = sp_data.get("uprate_inflation", True)
 
-    records = []
+    records: List[Dict[str, Any]] = []
     pots = starting_pots.copy()
+    # Iterate over each year from the first year after retirement to end_age
     for age in range(int(df_sorted["Age"].iloc[-1]) + 1, end_age + 1):
-        # Apply growth
+        # Grow each pot according to its ROI
         for acc, value in pots.items():
             growth_rate = account_rois.get(acc, 0.0)
             pots[acc] = value * (1.0 + growth_rate)
 
-        # Inflation should be compounded from current_age, not retirement age
+        # Inflation adjustment based on years since current age
         years_since_current = age - current_age
         cumulative_inflation = (1.0 + inflation) ** years_since_current
+        # Base withdrawal adjusted for inflation
         withdrawal_infl_adj = withdrawal_today * cumulative_inflation
-        withdrawal_todays = withdrawal_today
-        remaining_withdrawal = withdrawal_infl_adj
-        shortfall = 0.0
 
-        active_plan = [p for p in plan if age >= p["start_age"]]
-        total_prop = sum(
-            p["proportion"] for p in active_plan if p["proportion"] is not None
-        )
-        # Proportional withdrawals
-        if total_prop > 1.0:
-            raise ValueError(
-                f"Sum of proportions in withdraw_plan entries active at age {age} exceeds 1."
-            )
-        if total_prop > 0.0:
-            for p in active_plan:
-                proportion = p["proportion"]
-                acc = p["account"]
-                if proportion is not None:
-                    alloc = withdrawal_infl_adj * proportion
-                    taken = min(alloc, pots[acc])
-                    pots[acc] -= taken
-                    remaining_withdrawal -= taken
-        # Sequential withdrawals
-        if remaining_withdrawal > 1e-9:
-            for p in active_plan:
-                if p["proportion"] is not None:
-                    continue
-                acc = p["account"]
-                if pots[acc] > 0.0:
-                    taken = min(remaining_withdrawal, pots[acc])
-                    pots[acc] -= taken
-                    remaining_withdrawal -= taken
-                    if remaining_withdrawal <= 1e-9:
-                        break
-        if remaining_withdrawal > 1e-9:
-            shortfall = remaining_withdrawal
-
-        total_pot = sum(pots.values())
-        total_pot_todays = total_pot / cumulative_inflation
-
-        # --- State Pension Calculation ---
+        # Compute state pension for this age
         if age >= state_pension_age:
             if uprate_inflation:
                 sp_infl_adj = state_pension_per_year * cumulative_inflation
@@ -827,16 +853,149 @@ def project_post_retirement(
             sp_infl_adj = 0.0
             sp_todays = 0.0
 
-        record = {
+        # Determine the net withdrawal required from the pots after accounting for state pension
+        withdrawal_from_pots_infl = max(withdrawal_infl_adj - sp_infl_adj, 0.0)
+        withdrawal_from_pots_today = max(withdrawal_today - sp_todays, 0.0)
+
+        # Track current taxable income to compute incremental tax on pension withdrawals
+        taxable_income_so_far = sp_infl_adj
+        total_tax_paid = 0.0
+        remaining_net_to_fund = withdrawal_from_pots_infl
+
+        # Identify plan entries active at this age
+        active_plan = [p for p in plan if age >= p["start_age"]]
+        total_prop = sum(
+            p["proportion"] for p in active_plan if p["proportion"] is not None
+        )
+        if total_prop > 1.0 + 1e-9:
+            raise ValueError(
+                f"Sum of proportions in withdraw_plan entries active at age {age} exceeds 1."
+            )
+
+        # Helper function to compute gross withdrawal needed to achieve a net-of-tax amount
+        def compute_gross_from_net(net_required: float, taxable_base: float) -> float:
+            if net_required <= 0.0:
+                return 0.0
+            tax_at_base = calculate_income_tax(taxable_base, scotland, year)
+
+            def f(gross: float) -> float:
+                tax_total = calculate_income_tax(taxable_base + gross, scotland, year)
+                tax_due = tax_total - tax_at_base
+                return gross - tax_due - net_required
+
+            low = 0.0
+            high = net_required * 2.0 + 1.0
+            while f(high) < 0.0:
+                high *= 2.0
+            for _ in range(40):
+                mid = (low + high) / 2.0
+                if f(mid) > 0.0:
+                    high = mid
+                else:
+                    low = mid
+            return high
+
+        # Proportional withdrawals (net-of-tax basis)
+        if total_prop > 0.0 and remaining_net_to_fund > 0.0:
+            for p_entry in active_plan:
+                proportion = p_entry["proportion"]
+                acc = p_entry["account"]
+                if proportion is None:
+                    continue
+                alloc_net = withdrawal_from_pots_infl * proportion
+                if alloc_net <= 0.0:
+                    continue
+                if acc == "Pension Tax":
+                    gross_needed = compute_gross_from_net(
+                        alloc_net, taxable_income_so_far
+                    )
+                    gross_taken = min(gross_needed, pots.get(acc, 0.0))
+                    # Compute tax on this gross withdrawal
+                    tax_after = calculate_income_tax(
+                        taxable_income_so_far + gross_taken, scotland, year
+                    )
+                    tax_before = calculate_income_tax(
+                        taxable_income_so_far, scotland, year
+                    )
+                    tax_due = tax_after - tax_before
+                    net_taken = gross_taken - tax_due
+                    pots[acc] -= gross_taken
+                    taxable_income_so_far += gross_taken
+                    total_tax_paid += tax_due
+                    remaining_net_to_fund -= net_taken
+                    if remaining_net_to_fund < 0.0:
+                        remaining_net_to_fund = 0.0
+                else:
+                    net_taken = min(alloc_net, pots.get(acc, 0.0))
+                    pots[acc] -= net_taken
+                    remaining_net_to_fund -= net_taken
+                    if remaining_net_to_fund < 0.0:
+                        remaining_net_to_fund = 0.0
+
+        # Sequential withdrawals once proportional allocations are handled
+        if remaining_net_to_fund > 1e-9:
+            for p_entry in active_plan:
+                if p_entry["proportion"] is not None:
+                    continue
+                acc = p_entry["account"]
+                if remaining_net_to_fund <= 0.0:
+                    break
+                if pots.get(acc, 0.0) <= 0.0:
+                    continue
+                if acc == "Pension Tax":
+                    alloc_net = remaining_net_to_fund
+                    gross_needed = compute_gross_from_net(
+                        alloc_net, taxable_income_so_far
+                    )
+                    gross_taken = min(gross_needed, pots.get(acc, 0.0))
+                    tax_after = calculate_income_tax(
+                        taxable_income_so_far + gross_taken, scotland, year
+                    )
+                    tax_before = calculate_income_tax(
+                        taxable_income_so_far, scotland, year
+                    )
+                    tax_due = tax_after - tax_before
+                    net_taken = gross_taken - tax_due
+                    pots[acc] -= gross_taken
+                    taxable_income_so_far += gross_taken
+                    total_tax_paid += tax_due
+                    remaining_net_to_fund -= net_taken
+                    if remaining_net_to_fund < 0.0:
+                        remaining_net_to_fund = 0.0
+                else:
+                    net_taken = min(remaining_net_to_fund, pots.get(acc, 0.0))
+                    pots[acc] -= net_taken
+                    remaining_net_to_fund -= net_taken
+                    if remaining_net_to_fund < 0.0:
+                        remaining_net_to_fund = 0.0
+                if remaining_net_to_fund <= 1e-9:
+                    break
+
+        shortfall = remaining_net_to_fund if remaining_net_to_fund > 1e-9 else 0.0
+
+        total_pot = sum(pots.values())
+        total_pot_todays = (
+            total_pot / cumulative_inflation
+            if cumulative_inflation > 0.0
+            else total_pot
+        )
+
+        record: Dict[str, Any] = {
             "Age": age,
-            "Withdrawal (Inflation Adjusted)": withdrawal_infl_adj,
-            "Withdrawal (Today's Money)": withdrawal_todays,
+            "Withdrawal (Inflation Adjusted)": withdrawal_from_pots_infl,
+            "Withdrawal (Today's Money)": withdrawal_from_pots_today,
         }
         for acc, value in pots.items():
             record[f"Pot {acc}"] = value
         record["Total Pot"] = total_pot
         record["Total Pot (Today's Money)"] = total_pot_todays
         record["Remaining Withdrawal Shortfall"] = shortfall
+        record["Tax Paid on Withdrawals (Inflation Adjusted)"] = total_tax_paid
+        record["Tax Paid on Withdrawals (Today's Money)"] = (
+            total_tax_paid / cumulative_inflation
+            if cumulative_inflation > 0.0
+            else total_tax_paid
+        )
         record["State Pension (Inflation Adjusted)"] = sp_infl_adj
         record["State Pension (Today's Money)"] = sp_todays
         records.append(record)
