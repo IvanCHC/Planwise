@@ -882,8 +882,14 @@ def project_post_retirement(
         total_tax_paid_today = 0.0
         remaining_net_to_fund_today = withdrawal_from_pots_today
 
+        # Track withdrawals from each account in today's money.  This dict will be
+        # populated as net-of-tax amounts are taken from the pots.  Keys are
+        # account names; values are the amounts withdrawn in today's pounds.
+        withdrawals_today: Dict[str, float] = {}
+
         # Identify plan entries active at this age
         active_plan = [p for p in plan if age >= p["start_age"]]
+        # Sum of base proportions for all active entries; used for validation
         total_prop = sum(
             p["proportion"] for p in active_plan if p["proportion"] is not None
         )
@@ -891,6 +897,32 @@ def project_post_retirement(
             raise ValueError(
                 f"Sum of proportions in withdraw_plan entries active at age {age} exceeds 1."
             )
+
+        # --- Dynamic reallocation of proportions when pots are depleted ---
+        # Determine proportional entries and free up proportions from empty pots.  Freed
+        # proportions are redistributed evenly across the remaining proportional
+        # accounts with a positive balance.  Sequential (None) entries are
+        # unaffected by this redistribution; any leftover withdrawal beyond the
+        # redistributed proportional allocations is handled in the sequential step
+        # below.
+        active_prop_entries = [p for p in active_plan if p["proportion"] is not None]
+        freed_prop = 0.0
+        active_positive_prop_entries = []
+        for p_entry in active_prop_entries:
+            acc_name = p_entry["account"]
+            base_prop = p_entry["proportion"]
+            # If the account pot is depleted or non‑existent, free up its allocation
+            if pots.get(acc_name, 0.0) <= 0.0:
+                freed_prop += base_prop
+            else:
+                active_positive_prop_entries.append(p_entry)
+        effective_props: Dict[str, float] = {}
+        n_remaining = len(active_positive_prop_entries)
+        if n_remaining > 0 and total_prop > 0.0:
+            redistribute = freed_prop / n_remaining
+            for p_entry in active_positive_prop_entries:
+                acc_name = p_entry["account"]
+                effective_props[acc_name] = p_entry["proportion"] + redistribute
 
         # Helper function to compute gross withdrawal needed to achieve a net-of-tax amount (today's money)
         def compute_gross_from_net_today(
@@ -917,14 +949,16 @@ def project_post_retirement(
                     low = mid
             return high
 
-        # Proportional withdrawals (net-of-tax basis, today's money)
+        # Proportional withdrawals (net‑of‑tax basis, today's money) using dynamic proportions
         if total_prop > 0.0 and remaining_net_to_fund_today > 0.0:
-            for p_entry in active_plan:
-                proportion = p_entry["proportion"]
+            for p_entry in active_prop_entries:
                 acc = p_entry["account"]
-                if proportion is None:
+                # Skip accounts with no funds
+                if pots.get(acc, 0.0) <= 0.0:
                     continue
-                alloc_net_today = withdrawal_from_pots_today * proportion
+                # Use the dynamically adjusted proportion if available
+                prop = effective_props.get(acc, p_entry["proportion"])
+                alloc_net_today = withdrawal_from_pots_today * prop
                 if alloc_net_today <= 0.0:
                     continue
                 if acc == "Pension Tax":
@@ -949,6 +983,8 @@ def project_post_retirement(
                     taxable_income_so_far_today += gross_taken_today
                     total_tax_paid_today += tax_due_today
                     remaining_net_to_fund_today -= net_taken_today
+                    # Record the net withdrawal from this account (today's money)
+                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
                 else:
@@ -957,6 +993,8 @@ def project_post_retirement(
                     )
                     pots[acc] -= net_taken_today * cumulative_inflation
                     remaining_net_to_fund_today -= net_taken_today
+                    # Record the net withdrawal for this account
+                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
 
@@ -990,6 +1028,8 @@ def project_post_retirement(
                     taxable_income_so_far_today += gross_taken_today
                     total_tax_paid_today += tax_due_today
                     remaining_net_to_fund_today -= net_taken_today
+                    # Record the net withdrawal for this account
+                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
                 else:
@@ -999,6 +1039,8 @@ def project_post_retirement(
                     )
                     pots[acc] -= net_taken_today * cumulative_inflation
                     remaining_net_to_fund_today -= net_taken_today
+                    # Record the net withdrawal for this account
+                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
                 if remaining_net_to_fund_today <= 1e-9:
@@ -1023,8 +1065,13 @@ def project_post_retirement(
         }
         for acc, value in pots.items():
             record[f"Pot {acc}"] = value
+        # Record total pot values
         record["Total Pot"] = total_pot
         record["Total Pot (Today's Money)"] = total_pot_todays
+        # Record per-account withdrawals in today's money
+        for acc in pots.keys():
+            record[f"Withdrawal {acc} (Today's Money)"] = withdrawals_today.get(acc, 0.0)
+        # Record shortfall and tax details
         record["Remaining Withdrawal Shortfall"] = shortfall
         record["Tax Paid on Withdrawals (Inflation Adjusted)"] = (
             total_tax_paid_today * cumulative_inflation

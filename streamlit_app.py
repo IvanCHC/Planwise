@@ -1076,9 +1076,15 @@ def post_retirement_projection_section(
             available_accounts.append("Pension Tax Free")
         if taxable_balance > 0.0:
             available_accounts.append("Pension Tax")
-        if "Pot ISA" in pre_retirement_df.columns and float(pre_retirement_df["Pot ISA"].iloc[-1]) > 0.0:
+        if (
+            "Pot ISA" in pre_retirement_df.columns
+            and float(pre_retirement_df["Pot ISA"].iloc[-1]) > 0.0
+        ):
             available_accounts.append("ISA")
-        if "Pot LISA" in pre_retirement_df.columns and float(pre_retirement_df["Pot LISA"].iloc[-1]) > 0.0:
+        if (
+            "Pot LISA" in pre_retirement_df.columns
+            and float(pre_retirement_df["Pot LISA"].iloc[-1]) > 0.0
+        ):
             available_accounts.append("LISA")
 
         # --- Post‑retirement ROI adjustment ---
@@ -1089,9 +1095,8 @@ def post_retirement_projection_section(
         workplace_roi = getattr(returns, "workplace", 0.0)
         if total_pension > 0.0:
             pension_roi_default = (
-                (sipp_balance * sipp_roi + workplace_balance * workplace_roi)
-                / total_pension
-            )
+                sipp_balance * sipp_roi + workplace_balance * workplace_roi
+            ) / total_pension
         else:
             pension_roi_default = max(sipp_roi, workplace_roi)
         # Use current returns for ISA and LISA as defaults
@@ -1156,7 +1161,12 @@ def post_retirement_projection_section(
             )
             # Percentage allocation for this account.  0 means sequential (no fixed proportion).
             prop = st.slider(
-                f"Allocation to {acc} (%)", 0.0, 1.0, 0.0, step=0.05, key=f"withdraw_prop_{acc}"
+                f"Allocation to {acc} (%)",
+                0.0,
+                1.0,
+                0.0,
+                step=0.01,
+                key=f"withdraw_prop_{acc}",
             )
             if prop < 1e-9:
                 proportion = None
@@ -1170,10 +1180,20 @@ def post_retirement_projection_section(
                     "proportion": proportion,
                 }
             )
-        # Warn if total allocation exceeds 100 %
+        # Display allocation progress and warnings
+        # Show progress bar indicating the fraction of withdrawal allocated so far
+        st.progress(
+            min(total_prop, 1.0),
+            text=f"Allocated: {total_prop:.0%} of total withdrawal",
+        )
+        # Warn if allocation does not sum exactly to 100 %
         if total_prop > 1.0 + 1e-9:
             st.warning(
                 f"⚠️ Total allocation percentages exceed 100 %. Currently {total_prop:.0%}. Please adjust."
+            )
+        elif total_prop < 1.0 - 1e-9:
+            st.warning(
+                f"⚠️ Total allocation percentages are below 100 % (currently {total_prop:.0%}). The remainder will be withdrawn sequentially."
             )
 
         # Construct a new returns object for post‑retirement that uses the adjusted ROIs.
@@ -1273,6 +1293,12 @@ def post_retirement_projection_section(
 
         fig = pw.plotting.plot_post_retirement_withdrawals_todays(post_df)
         st.plotly_chart(fig, use_container_width=True)
+
+        # Stacked bar chart showing withdrawals from each account
+        fig_withdrawals = pw.plotting.plot_withdrawals_by_account(post_df)
+        # Only display the chart if there is data
+        if fig_withdrawals.data:
+            st.plotly_chart(fig_withdrawals, use_container_width=True)
 
     # Right: plot each account's pot over time (now in plotting module)
     with col2:

@@ -514,6 +514,76 @@ def plot_postretirement_accounts_todays(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def plot_withdrawals_by_account(
+    df: pd.DataFrame, title: Optional[str] = None
+) -> go.Figure:
+    """Plot a stacked bar chart of withdrawals from each account in today's money.
+
+    This helper scans the DataFrame for columns named ``"Withdrawal <Account> (Today's Money)"``
+    and constructs a stacked bar chart showing the amount withdrawn from each
+    account by age.  If no such columns are present, an empty figure is
+    returned.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The post‑retirement projection DataFrame returned by
+        :func:`planwise.core.project_post_retirement`.
+    title : str, optional
+        Title for the chart.  If omitted a default title is used.
+
+    Returns
+    -------
+    plotly.graph_objs._figure.Figure
+        A stacked bar chart showing withdrawals by account.
+    """
+    # Find withdrawal columns formatted as "Withdrawal <Account> (Today's Money)"
+    withdraw_cols = [
+        col
+        for col in df.columns
+        if col.startswith("Withdrawal ")
+        and col.endswith("(Today's Money)")
+        and not col.startswith("Withdrawal (Today's Money)")
+    ]
+    if not withdraw_cols:
+        return go.Figure()
+    # Extract account names from column names
+    accounts: List[str] = []
+    for col in withdraw_cols:
+        # Strip the prefix and suffix to get the account name
+        acc = col[len("Withdrawal ") : -len(" (Today's Money)")]
+        accounts.append(acc)
+    fig = go.Figure()
+    for col, acc in zip(withdraw_cols, accounts):
+        fig.add_trace(
+            go.Bar(
+                x=df["Age"],
+                y=df[col],
+                name=acc,
+            )
+        )
+    if title is None:
+        title = "Withdrawals by Account (Today's Money)"
+    fig.update_layout(
+        barmode="stack",
+        title=title,
+        xaxis=dict(title="Age"),
+        yaxis=dict(title="Withdrawal (£)"),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            font=dict(size=13),
+            orientation="v",
+        ),
+        template="plotly_white",
+        hovermode="x unified",
+        margin=dict(r=120),
+    )
+    return fig
+
+
 def plot_postretirement_accounts(df: pd.DataFrame) -> go.Figure:
     """Plot post‑retirement account pots over time, including Pension Tax Free/Tax."""
     fig = go.Figure()
