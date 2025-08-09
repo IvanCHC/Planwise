@@ -758,7 +758,11 @@ def project_post_retirement(
         starting_pots["Pension Tax Free"] = tax_free_balance
         starting_pots["Pension Tax"] = taxable_balance
         pension_roi = account_rois.pop("Pension")
-        account_rois["Pension Tax Free"] = pension_roi
+        # The tax-free portion represents a lump sum and does not earn
+        # separate interest; any growth on the pension is added to the
+        # taxable pot.  Therefore the tax-free pot ROI is set to zero,
+        # and the taxable pot uses the full pension ROI.
+        account_rois["Pension Tax Free"] = 0.0
         account_rois["Pension Tax"] = pension_roi
 
     # Preprocess withdrawal plan
@@ -850,10 +854,23 @@ def project_post_retirement(
     pots = starting_pots.copy()
     # Iterate over each year from the first year after retirement to end_age
     for age in range(int(df_sorted["Age"].iloc[-1]) + 1, end_age + 1):
-        # Grow each pot according to its ROI
-        for acc, value in pots.items():
+        # Grow each pot according to its ROI.  Pension tax-free and
+        # taxable pots are treated specially: growth on the combined
+        # pension is allocated entirely to the taxable pot, and the
+        # tax-free pot does not earn separate interest.
+        # First, update non-pension pots normally
+        for acc, value in list(pots.items()):
+            if acc in ("Pension Tax Free", "Pension Tax"):
+                continue
             growth_rate = account_rois.get(acc, 0.0)
             pots[acc] = value * (1.0 + growth_rate)
+        # Then handle the pension pots, if they exist
+        if "Pension Tax Free" in pots and "Pension Tax" in pots:
+            total_pension_balance = pots["Pension Tax Free"] + pots["Pension Tax"]
+            pension_roi = account_rois.get("Pension Tax", 0.0)
+            growth = total_pension_balance * pension_roi
+            # Allocate all growth to the taxable pot; tax-free pot remains constant
+            pots["Pension Tax"] += growth
 
         # Inflation adjustment based on years since current age
         years_since_current = age - current_age
