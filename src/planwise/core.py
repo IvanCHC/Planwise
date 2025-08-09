@@ -930,10 +930,18 @@ def project_post_retirement(
         ) -> float:
             if net_required <= 0.0:
                 return 0.0
-            tax_at_base = calculate_income_tax(taxable_base, scotland, year)
+            tax_at_base = calculate_income_tax(
+                income=taxable_base,
+                scotland=scotland,
+                year=year,
+            )
 
             def f(gross: float) -> float:
-                tax_total = calculate_income_tax(taxable_base + gross, scotland, year)
+                tax_total = calculate_income_tax(
+                    income=taxable_base + gross,
+                    scotland=scotland,
+                    year=year,
+                )
                 tax_due = tax_total - tax_at_base
                 return gross - tax_due - net_required
 
@@ -969,11 +977,16 @@ def project_post_retirement(
                         gross_needed_today, pots.get(acc, 0.0) / cumulative_inflation
                     )
                     # Compute tax on this gross withdrawal
+                    # Use named parameters to ensure correct argument order
                     tax_after = calculate_income_tax(
-                        taxable_income_so_far_today + gross_taken_today, scotland, year
+                        income=taxable_income_so_far_today + gross_taken_today,
+                        scotland=scotland,
+                        year=year,
                     )
                     tax_before = calculate_income_tax(
-                        taxable_income_so_far_today, scotland, year
+                        income=taxable_income_so_far_today,
+                        scotland=scotland,
+                        year=year,
                     )
                     tax_due_today = tax_after - tax_before
                     net_taken_today = gross_taken_today - tax_due_today
@@ -1017,10 +1030,14 @@ def project_post_retirement(
                         gross_needed_today, pots.get(acc, 0.0) / cumulative_inflation
                     )
                     tax_after = calculate_income_tax(
-                        taxable_income_so_far_today + gross_taken_today, scotland, year
+                        income=taxable_income_so_far_today + gross_taken_today,
+                        scotland=scotland,
+                        year=year,
                     )
                     tax_before = calculate_income_tax(
-                        taxable_income_so_far_today, scotland, year
+                        income=taxable_income_so_far_today,
+                        scotland=scotland,
+                        year=year,
                     )
                     tax_due_today = tax_after - tax_before
                     net_taken_today = gross_taken_today - tax_due_today
@@ -1046,6 +1063,104 @@ def project_post_retirement(
                 if remaining_net_to_fund_today <= 1e-9:
                     break
 
+        # ------------------------------------------------------------------
+        # Handle any remaining shortfall by withdrawing from future accounts.
+        #
+        # If there is still a net amount to fund after drawing from all
+        # eligible current accounts (both proportional and sequential), we
+        # attempt to cover this shortfall by pulling forward withdrawals
+        # from accounts whose start_age has not yet been reached.  The
+        # remaining shortfall is distributed evenly across such future
+        # accounts on a net-of-tax basis.  This ensures that additional
+        # withdrawals are spread fairly and that tax is applied where
+        # appropriate (i.e. for the Pension Tax pot).  If an account is
+        # depleted or has zero balance, it is skipped.  Redistribution
+        # continues until either the shortfall is zero or no future
+        # accounts with positive balances remain.
+        if remaining_net_to_fund_today > 1e-9:
+            # Identify accounts with a positive pot balance that are
+            # considered active at this age.  An account is active if its
+            # specified start_age has already been reached (start_age <= age).
+            # Accounts that are not referenced in the withdraw plan at all
+            # are treated as always active.  We only redistribute to
+            # accounts that have become active, ensuring that funds from
+            # future accounts remain untouched until their start age.
+            active_accounts: set[str] = set()
+            # Add accounts whose plan entry start_age has been reached
+            for p_entry in plan:
+                if p_entry["start_age"] <= age:
+                    active_accounts.add(p_entry["account"])
+            # Accounts not present in the plan are considered always active
+            plan_accounts = {p_entry["account"] for p_entry in plan}
+            for acc in pots.keys():
+                if acc not in plan_accounts:
+                    active_accounts.add(acc)
+            # Filter to only those active accounts with a positive balance
+            future_accounts = [
+                acc for acc in active_accounts if pots.get(acc, 0.0) > 0.0
+            ]
+            # Redistribute the shortfall across future accounts
+            # Loop until shortfall resolved or no accounts left
+            while remaining_net_to_fund_today > 1e-9 and future_accounts:
+                n_future = len(future_accounts)
+                if n_future == 0:
+                    break
+                net_share = remaining_net_to_fund_today / n_future
+                # Track accounts that still have funds after this round
+                new_future_accounts = []
+                for acc in future_accounts:
+                    # Skip if pot is zero or negative
+                    pot_balance = pots.get(acc, 0.0)
+                    if pot_balance <= 0.0:
+                        continue
+                    if acc == "Pension Tax":
+                        # Compute gross required to deliver the net share
+                        gross_needed_today = compute_gross_from_net_today(
+                            net_share, taxable_income_so_far_today
+                        )
+                        # Limit withdrawal by pot size (convert pot to today's money)
+                        gross_available_today = pot_balance / cumulative_inflation
+                        gross_taken_today = gross_needed_today
+                        if gross_taken_today > gross_available_today:
+                            gross_taken_today = gross_available_today
+                        # Compute tax due on this withdrawal using named parameters
+                        tax_after = calculate_income_tax(
+                            income=taxable_income_so_far_today + gross_taken_today,
+                            scotland=scotland,
+                            year=year,
+                        )
+                        tax_before = calculate_income_tax(
+                            income=taxable_income_so_far_today,
+                            scotland=scotland,
+                            year=year,
+                        )
+                        tax_due_today = tax_after - tax_before
+                        net_taken_today = gross_taken_today - tax_due_today
+                        # Update pot (convert gross back to future value)
+                        pots[acc] -= gross_taken_today * cumulative_inflation
+                        taxable_income_so_far_today += gross_taken_today
+                        total_tax_paid_today += tax_due_today
+                        remaining_net_to_fund_today -= net_taken_today
+                        # Record withdrawal
+                        withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                    else:
+                        # Non-taxable account: take net share or available pot
+                        max_net_today = pot_balance / cumulative_inflation
+                        net_taken_today = net_share
+                        if net_taken_today > max_net_today:
+                            net_taken_today = max_net_today
+                        pots[acc] -= net_taken_today * cumulative_inflation
+                        remaining_net_to_fund_today -= net_taken_today
+                        withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                    # If account still has funds, retain for further rounds
+                    if pots.get(acc, 0.0) > 1e-9:
+                        new_future_accounts.append(acc)
+                # Update the list of future accounts for the next round
+                future_accounts = new_future_accounts
+                # Continue looping until remaining_net_to_fund_today is zero or no accounts left
+            # End of redistribution loop
+
+        # After redistribution, compute any remaining shortfall
         shortfall_today = (
             remaining_net_to_fund_today if remaining_net_to_fund_today > 1e-9 else 0.0
         )
