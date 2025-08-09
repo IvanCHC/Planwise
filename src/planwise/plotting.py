@@ -721,3 +721,50 @@ def plot_post_retirement_withdrawals(df: pd.DataFrame) -> go.Figure:
         margin=dict(r=120),
     )
     return fig
+
+
+def plot_accumulated_tax_paid_postret(df: pd.DataFrame) -> go.Figure:
+    """Plot accumulated tax paid on withdrawals post-retirement."""
+    fig = go.Figure()
+    if "Tax Paid on Withdrawals (Inflation Adjusted)" in df.columns:
+        acc_tax_infl = df["Tax Paid on Withdrawals (Inflation Adjusted)"].cumsum()
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=acc_tax_infl,
+                mode="lines",
+                name="Accumulated Tax Paid (Inflation Adjusted)",
+                line=dict(color="crimson", width=2, dash="solid"),
+            )
+        )
+    if "Tax Paid on Withdrawals (Today's Money)" in df.columns:
+        acc_tax_today = df["Tax Paid on Withdrawals (Today's Money)"].cumsum()
+        fig.add_trace(
+            go.Scatter(
+                x=df["Age"],
+                y=acc_tax_today,
+                mode="lines",
+                name="Accumulated Tax Paid (Today's Money)",
+                line=dict(color="crimson", width=2, dash="dash"),
+            )
+        )
+    fig.update_layout(
+        title="Accumulated Tax Paid on Withdrawals (Post-Retirement)",
+        xaxis=dict(title=dict(text="Age", font=dict(size=16)), tickfont=dict(size=14)),
+        yaxis=dict(
+            title=dict(text="Accumulated Tax (£)", font=dict(size=16)),
+            tickfont=dict(size=14),
+        ),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor="left",
+            yanchor="top",
+            font=dict(size=13),
+            orientation="v",
+        ),
+        template="plotly_white",
+        hovermode="x unified",
+        margin=dict(r=120),
+    )
+    return fig

@@ -1119,7 +1119,9 @@ def post_retirement_projection_section(
         "Pot Pension Tax Free" in post_df.columns
         and "Pot Pension Tax" in post_df.columns
     ):
-        post_df["Pension"] = post_df["Pot Pension Tax Free"] + post_df["Pot Pension Tax"]
+        post_df["Pension"] = (
+            post_df["Pot Pension Tax Free"] + post_df["Pot Pension Tax"]
+        )
     elif "Pot Pension Tax Free" in post_df.columns:
         post_df["Pension"] = post_df["Pot Pension Tax Free"]
     elif "Pot Pension Tax" in post_df.columns:
@@ -1175,6 +1177,8 @@ def post_retirement_projection_section(
         # Call without account_names argument to avoid error
         fig_accounts = pw.plotting.plot_postretirement_accounts(post_df)
         st.plotly_chart(fig_accounts, use_container_width=True)
+        fig_acc_tax = pw.plotting.plot_accumulated_tax_paid_postret(post_df)
+        st.plotly_chart(fig_acc_tax, use_container_width=True)
 
     return post_df
 
