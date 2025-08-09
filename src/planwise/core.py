@@ -858,9 +858,9 @@ def project_post_retirement(
         withdrawal_from_pots_today = max(withdrawal_today - sp_todays, 0.0)
 
         # Track current taxable income to compute incremental tax on pension withdrawals
-        taxable_income_so_far = sp_infl_adj
-        total_tax_paid = 0.0
-        remaining_net_to_fund = withdrawal_from_pots_infl
+        taxable_income_so_far_today = sp_todays  # <-- use today's money
+        total_tax_paid_today = 0.0
+        remaining_net_to_fund_today = withdrawal_from_pots_today
 
         # Identify plan entries active at this age
         active_plan = [p for p in plan if age >= p["start_age"]]
@@ -872,8 +872,10 @@ def project_post_retirement(
                 f"Sum of proportions in withdraw_plan entries active at age {age} exceeds 1."
             )
 
-        # Helper function to compute gross withdrawal needed to achieve a net-of-tax amount
-        def compute_gross_from_net(net_required: float, taxable_base: float) -> float:
+        # Helper function to compute gross withdrawal needed to achieve a net-of-tax amount (today's money)
+        def compute_gross_from_net_today(
+            net_required: float, taxable_base: float
+        ) -> float:
             if net_required <= 0.0:
                 return 0.0
             tax_at_base = calculate_income_tax(taxable_base, scotland, year)
@@ -895,83 +897,97 @@ def project_post_retirement(
                     low = mid
             return high
 
-        # Proportional withdrawals (net-of-tax basis)
-        if total_prop > 0.0 and remaining_net_to_fund > 0.0:
+        # Proportional withdrawals (net-of-tax basis, today's money)
+        if total_prop > 0.0 and remaining_net_to_fund_today > 0.0:
             for p_entry in active_plan:
                 proportion = p_entry["proportion"]
                 acc = p_entry["account"]
                 if proportion is None:
                     continue
-                alloc_net = withdrawal_from_pots_infl * proportion
-                if alloc_net <= 0.0:
+                alloc_net_today = withdrawal_from_pots_today * proportion
+                if alloc_net_today <= 0.0:
                     continue
                 if acc == "Pension Tax":
-                    gross_needed = compute_gross_from_net(
-                        alloc_net, taxable_income_so_far
+                    gross_needed_today = compute_gross_from_net_today(
+                        alloc_net_today, taxable_income_so_far_today
                     )
-                    gross_taken = min(gross_needed, pots.get(acc, 0.0))
+                    gross_taken_today = min(
+                        gross_needed_today, pots.get(acc, 0.0) / cumulative_inflation
+                    )
                     # Compute tax on this gross withdrawal
                     tax_after = calculate_income_tax(
-                        taxable_income_so_far + gross_taken, scotland, year
+                        taxable_income_so_far_today + gross_taken_today, scotland, year
                     )
                     tax_before = calculate_income_tax(
-                        taxable_income_so_far, scotland, year
+                        taxable_income_so_far_today, scotland, year
                     )
-                    tax_due = tax_after - tax_before
-                    net_taken = gross_taken - tax_due
-                    pots[acc] -= gross_taken
-                    taxable_income_so_far += gross_taken
-                    total_tax_paid += tax_due
-                    remaining_net_to_fund -= net_taken
-                    if remaining_net_to_fund < 0.0:
-                        remaining_net_to_fund = 0.0
+                    tax_due_today = tax_after - tax_before
+                    net_taken_today = gross_taken_today - tax_due_today
+                    pots[acc] -= (
+                        gross_taken_today * cumulative_inflation
+                    )  # convert back to future value
+                    taxable_income_so_far_today += gross_taken_today
+                    total_tax_paid_today += tax_due_today
+                    remaining_net_to_fund_today -= net_taken_today
+                    if remaining_net_to_fund_today < 0.0:
+                        remaining_net_to_fund_today = 0.0
                 else:
-                    net_taken = min(alloc_net, pots.get(acc, 0.0))
-                    pots[acc] -= net_taken
-                    remaining_net_to_fund -= net_taken
-                    if remaining_net_to_fund < 0.0:
-                        remaining_net_to_fund = 0.0
+                    net_taken_today = min(
+                        alloc_net_today, pots.get(acc, 0.0) / cumulative_inflation
+                    )
+                    pots[acc] -= net_taken_today * cumulative_inflation
+                    remaining_net_to_fund_today -= net_taken_today
+                    if remaining_net_to_fund_today < 0.0:
+                        remaining_net_to_fund_today = 0.0
 
-        # Sequential withdrawals once proportional allocations are handled
-        if remaining_net_to_fund > 1e-9:
+        # Sequential withdrawals once proportional allocations are handled (today's money)
+        if remaining_net_to_fund_today > 1e-9:
             for p_entry in active_plan:
                 if p_entry["proportion"] is not None:
                     continue
                 acc = p_entry["account"]
-                if remaining_net_to_fund <= 0.0:
+                if remaining_net_to_fund_today <= 0.0:
                     break
                 if pots.get(acc, 0.0) <= 0.0:
                     continue
                 if acc == "Pension Tax":
-                    alloc_net = remaining_net_to_fund
-                    gross_needed = compute_gross_from_net(
-                        alloc_net, taxable_income_so_far
+                    alloc_net_today = remaining_net_to_fund_today
+                    gross_needed_today = compute_gross_from_net_today(
+                        alloc_net_today, taxable_income_so_far_today
                     )
-                    gross_taken = min(gross_needed, pots.get(acc, 0.0))
+                    gross_taken_today = min(
+                        gross_needed_today, pots.get(acc, 0.0) / cumulative_inflation
+                    )
                     tax_after = calculate_income_tax(
-                        taxable_income_so_far + gross_taken, scotland, year
+                        taxable_income_so_far_today + gross_taken_today, scotland, year
                     )
                     tax_before = calculate_income_tax(
-                        taxable_income_so_far, scotland, year
+                        taxable_income_so_far_today, scotland, year
                     )
-                    tax_due = tax_after - tax_before
-                    net_taken = gross_taken - tax_due
-                    pots[acc] -= gross_taken
-                    taxable_income_so_far += gross_taken
-                    total_tax_paid += tax_due
-                    remaining_net_to_fund -= net_taken
-                    if remaining_net_to_fund < 0.0:
-                        remaining_net_to_fund = 0.0
+                    tax_due_today = tax_after - tax_before
+                    net_taken_today = gross_taken_today - tax_due_today
+                    pots[acc] -= gross_taken_today * cumulative_inflation
+                    taxable_income_so_far_today += gross_taken_today
+                    total_tax_paid_today += tax_due_today
+                    remaining_net_to_fund_today -= net_taken_today
+                    if remaining_net_to_fund_today < 0.0:
+                        remaining_net_to_fund_today = 0.0
                 else:
-                    net_taken = min(remaining_net_to_fund, pots.get(acc, 0.0))
-                    pots[acc] -= net_taken
-                    remaining_net_to_fund -= net_taken
-                    if remaining_net_to_fund < 0.0:
-                        remaining_net_to_fund = 0.0
-                if remaining_net_to_fund <= 1e-9:
+                    net_taken_today = min(
+                        remaining_net_to_fund_today,
+                        pots.get(acc, 0.0) / cumulative_inflation,
+                    )
+                    pots[acc] -= net_taken_today * cumulative_inflation
+                    remaining_net_to_fund_today -= net_taken_today
+                    if remaining_net_to_fund_today < 0.0:
+                        remaining_net_to_fund_today = 0.0
+                if remaining_net_to_fund_today <= 1e-9:
                     break
 
-        shortfall = remaining_net_to_fund if remaining_net_to_fund > 1e-9 else 0.0
+        shortfall_today = (
+            remaining_net_to_fund_today if remaining_net_to_fund_today > 1e-9 else 0.0
+        )
+        shortfall = shortfall_today * cumulative_inflation
 
         total_pot = sum(pots.values())
         total_pot_todays = (
@@ -990,12 +1006,10 @@ def project_post_retirement(
         record["Total Pot"] = total_pot
         record["Total Pot (Today's Money)"] = total_pot_todays
         record["Remaining Withdrawal Shortfall"] = shortfall
-        record["Tax Paid on Withdrawals (Inflation Adjusted)"] = total_tax_paid
-        record["Tax Paid on Withdrawals (Today's Money)"] = (
-            total_tax_paid / cumulative_inflation
-            if cumulative_inflation > 0.0
-            else total_tax_paid
+        record["Tax Paid on Withdrawals (Inflation Adjusted)"] = (
+            total_tax_paid_today * cumulative_inflation
         )
+        record["Tax Paid on Withdrawals (Today's Money)"] = total_tax_paid_today
         record["State Pension (Inflation Adjusted)"] = sp_infl_adj
         record["State Pension (Today's Money)"] = sp_todays
         records.append(record)
