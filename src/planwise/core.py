@@ -661,6 +661,9 @@ def _returns_to_dict_postret(returns: InvestmentReturns) -> dict:
     }
 
 
+from typing import Optional
+
+
 def project_post_retirement(
     df: pd.DataFrame,
     withdrawal_today: float,
@@ -672,6 +675,9 @@ def project_post_retirement(
     year: int = 2025,
     scotland: bool = False,
     pension_tax_free_fraction: float = 0.25,
+    state_pension_age: Optional[int] = None,
+    state_pension_amount: Optional[float] = None,
+    uprate_state_pension: Optional[bool] = None,
 ) -> pd.DataFrame:
     """
     Project post-retirement account balances and withdrawals using a drawdown strategy.
@@ -821,10 +827,24 @@ def project_post_retirement(
             )
 
     # --- State Pension Projection ---
+    # Determine state pension parameters.  Values provided via function
+    # arguments take precedence over the defaults loaded from the database.
     sp_data = STATE_PENSION_DB.get(str(year), {})
-    state_pension_age = sp_data.get("state_pension_age", 67)
-    state_pension_per_year = sp_data.get("state_pension_per_year", 11000.0)
-    uprate_inflation = sp_data.get("uprate_inflation", True)
+    sp_age_default = sp_data.get("state_pension_age", 67)
+    sp_amount_default = sp_data.get("state_pension_per_year", 11000.0)
+    uprate_inflation_default = sp_data.get("uprate_inflation", True)
+    # Use overrides if provided, otherwise fall back to defaults
+    sp_age = state_pension_age if state_pension_age is not None else sp_age_default
+    sp_per_year = (
+        state_pension_amount
+        if state_pension_amount is not None
+        else sp_amount_default
+    )
+    uprate_inflation = (
+        uprate_state_pension
+        if uprate_state_pension is not None
+        else uprate_inflation_default
+    )
 
     records: List[Dict[str, Any]] = []
     pots = starting_pots.copy()
@@ -842,13 +862,13 @@ def project_post_retirement(
         withdrawal_infl_adj = withdrawal_today * cumulative_inflation
 
         # Compute state pension for this age
-        if age >= state_pension_age:
+        if age >= sp_age:
             if uprate_inflation:
-                sp_infl_adj = state_pension_per_year * cumulative_inflation
-                sp_todays = state_pension_per_year
+                sp_infl_adj = sp_per_year * cumulative_inflation
+                sp_todays = sp_per_year
             else:
-                sp_infl_adj = state_pension_per_year
-                sp_todays = state_pension_per_year / cumulative_inflation
+                sp_infl_adj = sp_per_year
+                sp_todays = sp_per_year / cumulative_inflation
         else:
             sp_infl_adj = 0.0
             sp_todays = 0.0

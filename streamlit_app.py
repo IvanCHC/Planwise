@@ -1036,6 +1036,7 @@ def post_retirement_projection_section(
 
     # --- Move all configuration to sidebar ---
     with st.sidebar.expander("Post-Retirement Settings", expanded=False):
+        # --- Withdrawal amount ---
         withdrawal_today = st.number_input(
             "Annual withdrawal in today's money (£)",
             min_value=0.0,
@@ -1045,72 +1046,173 @@ def post_retirement_projection_section(
             key="postret_withdrawal_today",
         )
 
-        # Combine SIPP and Workplace into Pension for withdrawal plan
-        # Only include Pension if either SIPP or Workplace exists
-        has_sipp = "Pot SIPP" in pre_retirement_df.columns
-        has_workplace = "Pot Workplace" in pre_retirement_df.columns
-        available_accounts = []
-        if has_sipp or has_workplace:
-            available_accounts.append("Pension")
-        if "ISA" in [c.replace("Pot ", "") for c in pre_retirement_df.columns]:
+        # --- Determine account balances at retirement to derive available accounts ---
+        # Retrieve final pot balances for pension-related wrappers.  Use zero if the
+        # column is absent.  These balances are used to derive the split between
+        # pension tax‑free and taxable sub‑accounts and to compute a weighted
+        # average return for the combined pension.  Note: the same 25 % tax‑free
+        # fraction used in the projection is applied here to estimate the
+        # available balances for the UI.
+        sipp_balance = (
+            float(pre_retirement_df["Pot SIPP"].iloc[-1])
+            if "Pot SIPP" in pre_retirement_df.columns
+            else 0.0
+        )
+        workplace_balance = (
+            float(pre_retirement_df["Pot Workplace"].iloc[-1])
+            if "Pot Workplace" in pre_retirement_df.columns
+            else 0.0
+        )
+        total_pension = sipp_balance + workplace_balance
+        # Split the pension into tax‑free and taxable pots (25 % up to the LTA of £268,275)
+        pension_tax_free_fraction = 0.25
+        lta_cap = 268275.0
+        tax_free_balance = min(total_pension * pension_tax_free_fraction, lta_cap)
+        taxable_balance = max(total_pension - tax_free_balance, 0.0)
+
+        # Determine which account wrappers are present based on their final balances
+        available_accounts: list = []
+        if tax_free_balance > 0.0:
+            available_accounts.append("Pension Tax Free")
+        if taxable_balance > 0.0:
+            available_accounts.append("Pension Tax")
+        if "Pot ISA" in pre_retirement_df.columns and float(pre_retirement_df["Pot ISA"].iloc[-1]) > 0.0:
             available_accounts.append("ISA")
-        if "LISA" in [c.replace("Pot ", "") for c in pre_retirement_df.columns]:
+        if "Pot LISA" in pre_retirement_df.columns and float(pre_retirement_df["Pot LISA"].iloc[-1]) > 0.0:
             available_accounts.append("LISA")
 
-        default_plan = []
-        for acc in available_accounts:
-            if acc == "LISA":
-                start_age = retirement_age
-                min_age = 60
-            elif acc == "Pension":
-                start_age = retirement_age
-                min_age = min(55, retirement_age)
-            elif acc == "ISA":
-                start_age = retirement_age
-                min_age = 0
-            else:
-                start_age = retirement_age
-                min_age = retirement_age
-            default_plan.append(
-                {"account": acc, "start_age": start_age, "min_age": min_age}
+        # --- Post‑retirement ROI adjustment ---
+        # Derive default pension ROI based on the weighted average of SIPP and
+        # workplace balances and returns.  If there is no pension, fall back
+        # to the maximum of the existing SIPP/Workplace returns.
+        sipp_roi = getattr(returns, "sipp", 0.0)
+        workplace_roi = getattr(returns, "workplace", 0.0)
+        if total_pension > 0.0:
+            pension_roi_default = (
+                (sipp_balance * sipp_roi + workplace_balance * workplace_roi)
+                / total_pension
             )
+        else:
+            pension_roi_default = max(sipp_roi, workplace_roi)
+        # Use current returns for ISA and LISA as defaults
+        lisa_roi_default = getattr(returns, "lisa", 0.0)
+        isa_roi_default = getattr(returns, "isa", 0.0)
 
-        st.write("**Withdrawal order and eligibility:**")
-        plan = []
-        for entry in default_plan:
+        st.markdown("**Adjust expected returns after retirement:**")
+        roi_pension = st.slider(
+            "Pension ROI (post‑retirement)",
+            0.00,
+            0.15,
+            value=round(pension_roi_default, 3),
+            step=0.005,
+            key="postret_roi_pension",
+        )
+        roi_lisa_post = st.slider(
+            "LISA ROI (post‑retirement)",
+            0.00,
+            0.15,
+            value=round(lisa_roi_default, 3),
+            step=0.005,
+            key="postret_roi_lisa",
+        )
+        roi_isa_post = st.slider(
+            "ISA ROI (post‑retirement)",
+            0.00,
+            0.15,
+            value=round(isa_roi_default, 3),
+            step=0.005,
+            key="postret_roi_isa",
+        )
+
+        # --- Withdrawal timing and allocation ---
+        st.markdown("**Specify withdrawal start age and allocation for each account:**")
+        plan: list = []
+        total_prop = 0.0
+        for acc in available_accounts:
+            # Determine the minimum permissible age for each wrapper
+            if acc == "Pension Tax Free" or acc == "Pension Tax":
+                # Pension withdrawals are allowed from age 55 (or retirement age if later)
+                min_age = min(55, retirement_age)
+                default_start_age = retirement_age
+            elif acc == "LISA":
+                # LISA withdrawals without penalty after age 60
+                min_age = 60
+                default_start_age = max(retirement_age, 60)
+            elif acc == "ISA":
+                min_age = 0
+                default_start_age = retirement_age
+            else:
+                min_age = retirement_age
+                default_start_age = retirement_age
             start_age = int(
                 st.number_input(
-                    f"Start age for {entry['account']}",
-                    min_value=entry["min_age"],
+                    f"Start age for {acc}",
+                    min_value=min_age,
                     max_value=100,
-                    value=entry["start_age"],
+                    value=default_start_age,
                     step=1,
-                    key=f"withdraw_start_{str(entry['account'])}",
+                    key=f"withdraw_start_{acc}",
                 )
             )
-            plan.append({"account": str(entry["account"]), "start_age": start_age})
+            # Percentage allocation for this account.  0 means sequential (no fixed proportion).
+            prop = st.slider(
+                f"Allocation to {acc} (%)", 0.0, 1.0, 0.0, step=0.05, key=f"withdraw_prop_{acc}"
+            )
+            if prop < 1e-9:
+                proportion = None
+            else:
+                proportion = float(prop)
+                total_prop += proportion
+            plan.append(
+                {
+                    "account": acc,
+                    "start_age": start_age,
+                    "proportion": proportion,
+                }
+            )
+        # Warn if total allocation exceeds 100 %
+        if total_prop > 1.0 + 1e-9:
+            st.warning(
+                f"⚠️ Total allocation percentages exceed 100 %. Currently {total_prop:.0%}. Please adjust."
+            )
+
+        # Construct a new returns object for post‑retirement that uses the adjusted ROIs.
+        post_returns = pw.core.InvestmentReturns(
+            lisa=roi_lisa_post,
+            isa=roi_isa_post,
+            sipp=roi_pension,
+            workplace=roi_pension,
+        )
 
     stc = st_container or st
     stc.subheader("Post-Retirement Projection")
 
     # Run projection
     # Pass current_age to ensure inflation is compounded from current age
-    current_age = (
+    current_age_calc = (
         int(pre_retirement_df["Age"].iloc[0])
         if "Age" in pre_retirement_df.columns
         else 30
     )
 
-    # --- State pension logic ---
-    # We'll add state pension as a column to the post-retirement df after projection
+    # Determine Scottish status and tax year from session state for accurate tax on pension drawdown
+    scotland_flag = st.session_state.get("scotland", False)
+    tax_year = st.session_state.get("tax_year", None)
+
+    # Execute the post‑retirement projection with the customised parameters and ROI
     post_df = pw.core.project_post_retirement(
         pre_retirement_df,
         withdrawal_today=withdrawal_today,
-        returns=returns,
+        returns=post_returns,
         withdraw_plan=plan,
         inflation=inflation,
         end_age=100,
-        current_age=current_age,
+        current_age=current_age_calc,
+        year=tax_year if tax_year is not None else 2025,
+        scotland=scotland_flag,
+        pension_tax_free_fraction=0.25,
+        state_pension_age=state_pension_age,
+        state_pension_amount=state_pension_amount,
     )
 
     # Combine pension-related pots into a single Pension column for display
