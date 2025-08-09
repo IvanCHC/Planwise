@@ -8,18 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial library structure
-- Core retirement projection functionality
-- UK and Scottish tax calculations
-- LISA, ISA, SIPP, and workplace pension modeling
-- Command-line interface
-- Plotting functions using Altair
-- Comprehensive test suite
-- Streamlit web application
-- Documentation and examples
+- Nothing
 
 ### Changed
-- Converted from single Streamlit app to full Python library
+- Nothing
 
 ### Deprecated
 - Nothing
@@ -32,6 +24,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Nothing
+
+## [0.2.0] - 2025-08-09
+
+### Added
+- Pre-commit configuration for code quality
+- Makefile for common development tasks
+- Project packaging with `pyproject.toml` and `setup.sh`
+- Expanded documentation (`docs/index.md`)
+- New CLI entry point (`src/planwise/cli.py`)
+- Core logic modules: `core.py`, `ni.py`, `tax.py`, `plotting.py`
+- Data files for tax, NI, and pension bands
+- Comprehensive test suite for CLI, core, NI, plotting, and tax modules
+- Streamlit app (`streamlit_app.py`)
+
+### Changed
+- Updated `.gitignore` and `LICENSE`
+- Improved `README.md` with new instructions
 
 ## [0.1.0] - 2025-08-02
 

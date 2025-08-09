@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planwise"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Python library for modeling retirement savings across various UK tax wrappers including Lifetime ISA (LISA), Stocks & Shares ISA, Self-Invested Personal Pension (SIPP) and workplace pensions."
 readme = "README.md"
 license = "MIT"
