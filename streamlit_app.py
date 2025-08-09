@@ -911,110 +911,6 @@ def show_download(df: pd.DataFrame, current_age: int, retirement_age: int) -> No
     )
 
 
-def show_sidebar_footer() -> None:
-    """Display informational text at the bottom of the sidebar."""
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(
-        """
-        **Key assumptions:**
-        - No carry-forward of unused allowances
-        - Relief-at-source for pension contributions
-        """
-    )
-
-
-def main() -> None:
-    """Entry point for the Streamlit app.
-
-    This function sets up the page configuration, renders the introductory
-    explanatory text, collects user inputs via the sidebar and then runs the
-    retirement projection. Results are displayed using helper functions. Any
-    errors during projection are caught and displayed to the user.
-    """
-    favicon_path = os.path.join("src", "assets", "favicon.ico")
-    favicon = Image.open(favicon_path)
-    st.set_page_config(page_title="Planwise", page_icon=favicon, layout="wide")
-    st.title("Planewise: UK Investment & Retirement Planning Model")
-    logo_path = os.path.join("src", "assets", "logo.png")
-    st.sidebar.image(logo_path, use_container_width=True)
-
-    st.markdown(
-        """
-        Use this tool to project how your investments in a Lifetime ISA (LISA), Stocks & Shares ISA,
-        Self-Invested Personal Pension (SIPP) and workplace pension might grow over time. The
-        model calculates net and gross contributions, tax relief and refunds, and the nominal
-        growth of each wrapper.
-
-        **Remember that this is a simplification and real tax rules may change.
-        You should consult a financial adviser for personalised advice.**
-        """
-    )
-
-    (
-        user,
-        contrib,
-        returns,
-        income,
-        inflation,
-        use_qualifying,
-        tax_year,
-        current_age,
-        retirement_age,
-        state_pension_age,
-        state_pension_amount,
-    ) = sidebar_inputs()
-
-    try:
-        # Run the pre‑retirement projection once.  This DataFrame will feed
-        # the visualisations and summary metrics.  Keep it outside of the
-        # tab contexts to avoid unnecessary recomputation when switching tabs.
-        df = pw.project_retirement(
-            user=user,
-            contrib=contrib,
-            returns=returns,
-            income=income,
-            inflation=inflation,
-            use_qualifying_earnings=use_qualifying,
-            year=tax_year,
-        )
-
-        # Create top‑level tabs for pre‑ and post‑retirement analysis.  This
-        # organisation improves navigation and keeps the UI from becoming
-        # cluttered when exploring different aspects of the model.
-        pre_tab, post_tab = st.tabs(
-            [
-                "Pre‑Retirement Analysis",
-                "Post‑Retirement Analysis",
-            ]
-        )
-
-        with pre_tab:
-            final_row, total_final = show_summary_metrics(df)
-            show_salary_and_contribution_breakdown(income, df)
-            show_final_breakdown(final_row, total_final)
-            show_data_table(df)
-            show_visualizations(df)
-            show_download(df, current_age, retirement_age)
-
-        with post_tab:
-            post_retirement_projection_section(
-                pre_retirement_df=df,
-                returns=returns,
-                inflation=inflation,
-                retirement_age=retirement_age,
-                state_pension_age=state_pension_age,
-                state_pension_amount=state_pension_amount,
-            )
-
-    except Exception as e:
-        st.error(f"Error running projection: {e}")
-        st.error("Please check your input parameters and try again.")
-
-    # Always show the sidebar footer after the main content.  Placing this
-    # outside the try/except ensures it appears even if an error occurs.
-    show_sidebar_footer()
-
-
 def post_retirement_projection_section(
     pre_retirement_df: pd.DataFrame,
     returns: "pw.core.InvestmentReturns",
@@ -1365,6 +1261,93 @@ def show_salary_and_contribution_breakdown(
     with col4:
         fig = pw.make_income_breakdown_pie(income)
         st.plotly_chart(fig, use_container_width=True)
+
+def main() -> None:
+    """Entry point for the Streamlit app.
+
+    This function sets up the page configuration, renders the introductory
+    explanatory text, collects user inputs via the sidebar and then runs the
+    retirement projection. Results are displayed using helper functions. Any
+    errors during projection are caught and displayed to the user.
+    """
+    favicon_path = os.path.join("src", "assets", "favicon.ico")
+    favicon = Image.open(favicon_path)
+    st.set_page_config(page_title="Planwise", page_icon=favicon, layout="wide")
+    st.title("Planewise: UK Investment & Retirement Planning Model")
+    logo_path = os.path.join("src", "assets", "logo.png")
+    st.sidebar.image(logo_path, use_container_width=True)
+
+    st.markdown(
+        """
+        Use this tool to project how your investments in a Lifetime ISA (LISA), Stocks & Shares ISA,
+        Self-Invested Personal Pension (SIPP) and workplace pension might grow over time. The
+        model calculates net and gross contributions, tax relief and refunds, and the nominal
+        growth of each wrapper.
+
+        **Remember that this is a simplification and real tax rules may change.
+        You should consult a financial adviser for personalised advice.**
+        """
+    )
+
+    (
+        user,
+        contrib,
+        returns,
+        income,
+        inflation,
+        use_qualifying,
+        tax_year,
+        current_age,
+        retirement_age,
+        state_pension_age,
+        state_pension_amount,
+    ) = sidebar_inputs()
+
+    try:
+        # Run the pre‑retirement projection once.  This DataFrame will feed
+        # the visualisations and summary metrics.  Keep it outside of the
+        # tab contexts to avoid unnecessary recomputation when switching tabs.
+        df = pw.project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=inflation,
+            use_qualifying_earnings=use_qualifying,
+            year=tax_year,
+        )
+
+        # Create top‑level tabs for pre‑ and post‑retirement analysis.  This
+        # organisation improves navigation and keeps the UI from becoming
+        # cluttered when exploring different aspects of the model.
+        pre_tab, post_tab = st.tabs(
+            [
+                "Pre‑Retirement Analysis",
+                "Post‑Retirement Analysis",
+            ]
+        )
+
+        with pre_tab:
+            final_row, total_final = show_summary_metrics(df)
+            show_salary_and_contribution_breakdown(income, df)
+            show_final_breakdown(final_row, total_final)
+            show_data_table(df)
+            show_visualizations(df)
+            show_download(df, current_age, retirement_age)
+
+        with post_tab:
+            post_retirement_projection_section(
+                pre_retirement_df=df,
+                returns=returns,
+                inflation=inflation,
+                retirement_age=retirement_age,
+                state_pension_age=state_pension_age,
+                state_pension_amount=state_pension_amount,
+            )
+
+    except Exception as e:
+        st.error(f"Error running projection: {e}")
+        st.error("Please check your input parameters and try again.")
 
 
 if __name__ == "__main__":
