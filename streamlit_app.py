@@ -25,11 +25,13 @@ carry forward of unused allowances and assumes relief at source for pension
 contributions.
 """
 
+import os
 from typing import Any, Tuple
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from PIL import Image
 
 # Import from our library
 import planwise as pw
@@ -912,15 +914,11 @@ def show_download(df: pd.DataFrame, current_age: int, retirement_age: int) -> No
 def show_sidebar_footer() -> None:
     """Display informational text at the bottom of the sidebar."""
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### ℹ️ About")
     st.sidebar.markdown(
         """
-        This tool models UK retirement savings.
-
         **Key assumptions:**
         - No carry-forward of unused allowances
         - Relief-at-source for pension contributions
-        - Government LISA bonus of 25% (max £1,000/year)
         """
     )
 
@@ -933,8 +931,12 @@ def main() -> None:
     retirement projection. Results are displayed using helper functions. Any
     errors during projection are caught and displayed to the user.
     """
-    st.set_page_config(page_title="UK Retirement & Investment Planner", layout="wide")
-    st.title("UK Investment & Retirement Planning Model")
+    favicon_path = os.path.join("src", "assets", "favicon.ico")
+    favicon = Image.open(favicon_path)
+    st.set_page_config(page_title="Planwise", page_icon=favicon, layout="wide")
+    st.title("Planewise: UK Investment & Retirement Planning Model")
+    logo_path = os.path.join("src", "assets", "logo.png")
+    st.sidebar.image(logo_path, use_container_width=True)
 
     st.markdown(
         """
