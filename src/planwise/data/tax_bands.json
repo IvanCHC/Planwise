@@ -1,0 +1,25 @@
+{
+  "2025": {
+    "scotland": {
+      "personal_allowance": 12570.0,
+      "bands": [
+        {"threshold": 12570, "rate": 0.0},
+        {"threshold": 15397, "rate": 0.19},
+        {"threshold": 27491, "rate": 0.20},
+        {"threshold": 43662, "rate": 0.21},
+        {"threshold": 75000, "rate": 0.42},
+        {"threshold": 125140, "rate": 0.45},
+        {"threshold": "inf", "rate": 0.48}
+      ]
+    },
+    "rest_of_uk": {
+      "personal_allowance": 12570.0,
+      "bands": [
+        {"threshold": 12570, "rate": 0.0},
+        {"threshold": 50270, "rate": 0.20},
+        {"threshold": 125140, "rate": 0.40},
+        {"threshold": "inf", "rate": 0.45}
+      ]
+    }
+  }
+}
