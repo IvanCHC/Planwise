@@ -1227,3 +1227,221 @@ def project_post_retirement(
 
     result_df = pd.DataFrame(records)
     return result_df
+
+
+import logging
+
+from planwise.streamlit.sidebar_utils import ProfileSettings
+
+LOGGER = logging.getLogger(__name__)
+
+
+class InvestmentSimulator:
+    def __init__(self, profile: "ProfileSettings") -> None:
+        self.profile = profile
+        self.tax_year = profile.tax_year
+
+        self._current_age = profile.personal_details.current_age
+        self._retirement_age = profile.personal_details.retirement_age
+        self._salary = profile.personal_details.salary
+        self._take_home_salary = profile.personal_details.take_home_salary
+        self._income_tax = profile.personal_details.income_tax
+        self._ni_contribution = profile.personal_details.ni_contribution
+
+        self._lisa_balance = profile.account_balances.lisa_balance
+        self._isa_balance = profile.account_balances.isa_balance
+        self._sipp_balance = profile.account_balances.sipp_balance
+        self._workplace_balance = profile.account_balances.workplace_pension_balance
+
+        self._lisa_net_contribution = 0.0
+        self._isa_net_contribution = 0.0
+        self._workplace_net_contribution = 0.0
+        self._sipp_net_contribution = 0.0
+
+        self._lisa_gross_contribution = 0.0
+        self._isa_gross_contribution = 0.0
+        self._workplace_gross_contribution = 0.0
+        self._sipp_gross_contribution = 0.0
+
+    def simulate(self) -> pd.DataFrame:
+        simulation_years = self._retirement_age - self._current_age
+        records: list[dict[str, Any]] = []
+        for i in range(simulation_years):
+            record: dict[str, Any] = {}
+
+            age = self._current_age + i
+            record["Age"] = age
+            record["Salary"] = self._salary
+            record["Take Home Salary"] = self._take_home_salary
+            record["Income Tax"] = self._income_tax
+            record["NI Contribution"] = self._ni_contribution
+
+            record.update(self._calculate_lisa_contribution(age))
+            record.update(self._calculate_isa_contribution(age))
+            record.update(self._calculate_workplace_contribution())
+            record.update(self._calculate_sipp_contribution(age))
+            record.update(self._calculate_tax_relief_and_refund(record))
+            record.update(self._aggregate_returns(record))
+
+            records.append(record)
+        return pd.DataFrame(records)
+
+    def _calculate_lisa_contribution(self, age: int) -> dict[str, float]:
+        lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
+            "lisa_maximum_contribution_age", 50
+        )
+        lisa_contribution = (
+            self.profile.contribution_settings.lisa_contribution
+            if age < lisa_maximum_contribution_age
+            else 0.0
+        )
+        lisa_bonus = lisa_contribution * 0.25  # 25% bonus
+        lisa_gross = lisa_contribution + lisa_bonus
+        return {
+            "LISA Net": lisa_contribution,
+            "LISA Bonus": lisa_bonus,
+            "LISA Gross": lisa_gross,
+        }
+
+    def _calculate_isa_contribution(self, age: int) -> dict[str, float]:
+        isa_contribution = self.profile.contribution_settings.isa_contribution
+        lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
+            "lisa_maximum_contribution_age", 50
+        )
+        if age > lisa_maximum_contribution_age:
+            post_50_lisa_to_isa = (
+                self.profile.post_50_contribution_settings.post_50_lisa_to_isa_contribution
+            )
+            isa_contribution += post_50_lisa_to_isa
+        return {"ISA Net": isa_contribution, "ISA Gross": isa_contribution}
+
+    def _calculate_workplace_contribution(self) -> dict[str, float]:
+        workplace_er_contribution = (
+            self.profile.contribution_settings.workplace_er_contribution
+        )
+        workplace_ee_contribution = (
+            self.profile.contribution_settings.workplace_ee_contribution
+        )
+        workplace_tax_relief = (
+            workplace_ee_contribution * 0.25  # Assuming 25% tax relief
+        )
+        return {
+            "Workplace ER": workplace_er_contribution,
+            "Workplace EE Net": workplace_ee_contribution,
+            "Workplace EE Gross": workplace_ee_contribution + workplace_tax_relief,
+            "Workplace Tax Relief": workplace_tax_relief,
+        }
+
+    def _calculate_sipp_contribution(self, age: int) -> dict[str, float]:
+        sipp_contribution = self.profile.contribution_settings.sipp_contribution
+        lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
+            "lisa_maximum_contribution_age", 50
+        )
+        if age > lisa_maximum_contribution_age:
+            post_50_lisa_to_sipp = (
+                self.profile.post_50_contribution_settings.post_50_lisa_to_sipp_contribution
+            )
+            sipp_contribution += post_50_lisa_to_sipp
+        sipp_tax_relief = sipp_contribution * 0.25  # Assuming 25% tax relief
+        return {
+            "SIPP Net": sipp_contribution,
+            "SIPP Gross": sipp_contribution + sipp_tax_relief,
+            "SIPP Tax Relief": sipp_tax_relief,
+        }
+
+    def _calculate_tax_relief_and_refund(
+        self, record: dict[str, float]
+    ) -> dict[str, float]:
+        tax_relief = record.get("Workplace Tax Relief", 0.0) + record.get(
+            "SIPP Tax Relief", 0.0
+        )
+        total_ee_pension = record.get("Workplace EE Gross", 0.0) + record.get(
+            "SIPP Gross", 0.0
+        )
+
+        pre_tax_salary = self.profile.personal_details.salary
+        scotland = self.profile.scotland
+        year = self.tax_year
+
+        tax_before = calculate_income_tax(pre_tax_salary, scotland, year)
+        tax_after = calculate_income_tax(
+            pre_tax_salary - total_ee_pension, scotland, year
+        )
+        tax_refund = max(tax_before - tax_after - tax_relief, 0.0)
+        return {
+            "Tax Relief": tax_relief,
+            "Tax Refund": tax_refund,
+        }
+
+    def _aggregate_returns(self, record: dict[str, Any]) -> dict[str, float]:
+        self._lisa_balance += record.get("LISA Gross", 0.0)
+        self._lisa_balance *= (
+            1 + self.profile.expected_returns_and_inflation.expected_lisa_annual_return
+        )
+        self._isa_balance += record.get("LISA Gross", 0.0)
+        self._isa_balance *= (
+            1 + self.profile.expected_returns_and_inflation.expected_isa_annual_return
+        )
+        self._workplace_balance += record.get("Workplace EE Gross", 0.0) + record.get(
+            "Workplace ER", 0.0
+        )
+        self._workplace_balance *= (
+            1
+            + self.profile.expected_returns_and_inflation.expected_workplace_annual_return
+        )
+        self._sipp_balance += record.get("SIPP Gross", 0.0)
+        self._sipp_balance *= (
+            1 + self.profile.expected_returns_and_inflation.expected_sipp_annual_return
+        )
+
+        self._lisa_net_contribution += record.get("LISA Net", 0.0)
+        self._isa_net_contribution += record.get("ISA Net", 0.0)
+        self._workplace_net_contribution += record.get("Workplace EE Net", 0.0)
+        self._sipp_net_contribution += record.get("SIPP Net", 0.0)
+
+        self._lisa_gross_contribution += record.get("LISA Gross", 0.0)
+        self._isa_gross_contribution += record.get("ISA Gross", 0.0)
+        self._workplace_gross_contribution += record.get("Workplace EE Gross", 0.0)
+        self._sipp_gross_contribution += record.get("SIPP Gross", 0.0)
+
+        portfilo_balance = (
+            self._lisa_balance
+            + self._isa_balance
+            + self._sipp_balance
+            + self._workplace_balance
+        )
+        portfilo_net_contribution = (
+            self._lisa_net_contribution
+            + self._isa_net_contribution
+            + self._workplace_net_contribution
+            + self._sipp_net_contribution
+        )
+        portfilo_gross_contribution = (
+            self._lisa_gross_contribution
+            + self._isa_gross_contribution
+            + self._workplace_gross_contribution
+            + self._sipp_gross_contribution
+        )
+
+        return {
+            "LISA Balance": self._lisa_balance,
+            "ISA Balance": self._isa_balance,
+            "Workplace Balance": self._workplace_balance,
+            "SIPP Balance": self._sipp_balance,
+            "LISA Net Contribution": self._lisa_net_contribution,
+            "ISA Net Contribution": self._isa_net_contribution,
+            "Workplace Net Contribution": self._workplace_net_contribution,
+            "SIPP Net Contribution": self._sipp_net_contribution,
+            "LISA Gross Contribution": self._lisa_gross_contribution,
+            "ISA Gross Contribution": self._isa_gross_contribution,
+            "Workplace Gross Contribution": self._workplace_gross_contribution,
+            "SIPP Gross Contribution": self._sipp_gross_contribution,
+            "Portfolio Balance": portfilo_balance,
+            "Portfolio Net Contribution": portfilo_net_contribution,
+            "Portfolio Gross Contribution": portfilo_gross_contribution,
+        }
+
+
+def project_investment(profile: "ProfileSettings") -> pd.DataFrame:
+    simulator = InvestmentSimulator(profile)
+    return simulator.simulate()
