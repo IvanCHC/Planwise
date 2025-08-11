@@ -623,20 +623,23 @@ def _post_retirement_section(
                 help="How much you want to withdraw from ISA per year as a percentage of the annual withdrawal amount.",
                 key="postret_isa_targeted_withdrawal_percentage",
             )
-            pension_withdrawal_age = pw.LIMITS_DB[str(tax_year)][
+            taxfree_pension_withdrawal_age_minimum = pw.LIMITS_DB[str(tax_year)][
                 "pension_withdrawal_age"
             ]
-            pension_withdrawal_age = st.number_input(
-                "Pension withdrawal age",
-                min_value=pension_withdrawal_age,
+            taxfree_pension_withdrawal_age = st.number_input(
+                "Pension Taxfree withdrawal age",
+                min_value=taxfree_pension_withdrawal_age_minimum,
                 max_value=100,
-                value=max(pension_withdrawal_age, personal_details.retirement_age),
+                value=max(
+                    taxfree_pension_withdrawal_age_minimum,
+                    personal_details.retirement_age,
+                ),
                 step=1,
                 help="Age at which you can start withdrawing from pension.",
                 key="postret_pension_withdrawal_age",
             )
-            pension_withdrawal_percentage = st.slider(
-                "Targeted Pension withdrawal percentage (%)",
+            taxfree_pension_withdrawal_percentage = st.slider(
+                "Targeted Taxfree Pension withdrawal percentage (%)",
                 0.0,
                 1.0,
                 0.0,
@@ -645,10 +648,36 @@ def _post_retirement_section(
                 key="postret_pension_targeted_withdrawal_percentage",
             )
 
+            taxable_pension_withdrawal_age_minimum = pw.LIMITS_DB[str(tax_year)][
+                "pension_withdrawal_age"
+            ]
+            taxable_pension_withdrawal_age = st.number_input(
+                "Pension Taxable withdrawal age",
+                min_value=taxable_pension_withdrawal_age_minimum,
+                max_value=100,
+                value=max(
+                    taxable_pension_withdrawal_age_minimum,
+                    personal_details.retirement_age,
+                ),
+                step=1,
+                help="Age at which you can start withdrawing from pension.",
+                key="postret_taxable_pension_withdrawal_age",
+            )
+            taxable_pension_withdrawal_percentage = st.slider(
+                "Targeted Taxable Pension withdrawal percentage (%)",
+                0.0,
+                1.0,
+                0.0,
+                step=0.01,
+                help="How much you want to withdraw from Pension per year as a percentage of the annual withdrawal amount.",
+                key="postret_taxable_pension_targeted_withdrawal_percentage",
+            )
+
             total_withdrawal_percentage = (
                 lisa_targeted_withdrawal_percentage
                 + isa_targeted_withdrawal_percentage
-                + pension_withdrawal_percentage
+                + taxfree_pension_withdrawal_percentage
+                + taxable_pension_withdrawal_percentage
             )
             total_withdrawal_amount = (
                 withdrawal_today_amount * total_withdrawal_percentage
@@ -676,8 +705,10 @@ def _post_retirement_section(
         postret_lisa_targeted_withdrawal_percentage=lisa_targeted_withdrawal_percentage,
         postret_isa_withdrawal_age=isa_withdrawal_age,
         postret_isa_targeted_withdrawal_percentage=isa_targeted_withdrawal_percentage,
-        postret_pension_withdrawal_age=pension_withdrawal_age,
-        postret_pension_targeted_withdrawal_percentage=pension_withdrawal_percentage,
+        postret_taxfree_pension_withdrawal_age=taxfree_pension_withdrawal_age,
+        postret_taxfree_pension_targeted_withdrawal_percentage=taxfree_pension_withdrawal_percentage,
+        postret_taxable_pension_withdrawal_age=taxable_pension_withdrawal_age,
+        postret_taxable_pension_targeted_withdrawal_percentage=taxable_pension_withdrawal_percentage,
     )
     return post_retirement_settings
 

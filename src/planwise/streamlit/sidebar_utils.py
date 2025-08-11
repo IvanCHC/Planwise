@@ -232,10 +232,14 @@ class PostRetirementSettings:
         The age at which the user plans to start withdrawing from the ISA account.
     postret_isa_targeted_withdrawal_percentage: float
         The targeted percentage of the ISA account to withdraw after retirement.
-    postret_pension_withdrawal_age: int
-        The age at which the user plans to start withdrawing from the pension account.
-    postret_pension_targeted_withdrawal_percentage: float
-        The targeted percentage of the pension account to withdraw after retirement.
+    postret_taxfree_pension_withdrawal_age: int
+        The age at which the user plans to start withdrawing tax-free from the pension account.
+    postret_taxfree_pension_targeted_withdrawal_percentage: float
+        The targeted percentage of the pension account to withdraw tax-free after retirement.
+    postret_taxable_pension_withdrawal_age: int
+        The age at which the user plans to start withdrawing taxable from the pension account.
+    postret_taxable_pension_targeted_withdrawal_percentage: float
+        The targeted percentage of the pension account to withdraw taxable after retirement.
     """
 
     withdrawal_today_amount: float
@@ -246,8 +250,10 @@ class PostRetirementSettings:
     postret_lisa_targeted_withdrawal_percentage: float
     postret_isa_withdrawal_age: int
     postret_isa_targeted_withdrawal_percentage: float
-    postret_pension_withdrawal_age: int
-    postret_pension_targeted_withdrawal_percentage: float
+    postret_taxfree_pension_withdrawal_age: int
+    postret_taxfree_pension_targeted_withdrawal_percentage: float
+    postret_taxable_pension_withdrawal_age: int
+    postret_taxable_pension_targeted_withdrawal_percentage: float
 
 
 @dataclass

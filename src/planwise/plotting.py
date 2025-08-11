@@ -26,8 +26,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objs as go
 
-from .core import IncomeBreakdown
-
 
 @dataclass
 class RetirementPlotter:
@@ -310,38 +308,38 @@ def make_contribution_growth_plot(
     return make_growth_plot(df, title)
 
 
-def make_income_breakdown_pie(income: IncomeBreakdown) -> go.Figure:
-    """Create a pie chart for the income breakdown (take‑home, tax and NI).
+# def make_income_breakdown_pie(income: IncomeBreakdown) -> go.Figure:
+#     """Create a pie chart for the income breakdown (take‑home, tax and NI).
 
-    Parameters
-    ----------
-    income : planwise.core.IncomeBreakdown
-        A dataclass describing the user's income after tax and NI.  Any
-        attributes missing on this object will default to zero.
+#     Parameters
+#     ----------
+#     income : planwise.core.IncomeBreakdown
+#         A dataclass describing the user's income after tax and NI.  Any
+#         attributes missing on this object will default to zero.
 
-    Returns
-    -------
-    plotly.graph_objs.Figure
-        A Plotly pie chart illustrating the relative proportions of take‑home
-        salary, income tax and national insurance.
-    """
-    take_home = getattr(income, "take_home_salary", 0)
-    income_tax = getattr(income, "income_tax", 0)
-    ni_due = getattr(income, "ni_due", 0)
-    pie_data = pd.DataFrame(
-        {
-            "Component": ["Take-home", "Income Tax", "NI Contribution"],
-            "Amount": [take_home, income_tax, ni_due],
-        }
-    )
-    fig = px.pie(
-        pie_data,
-        names="Component",
-        values="Amount",
-        title="Income Breakdown",
-        color_discrete_sequence=px.colors.sequential.Blues,
-    )
-    return fig
+#     Returns
+#     -------
+#     plotly.graph_objs.Figure
+#         A Plotly pie chart illustrating the relative proportions of take‑home
+#         salary, income tax and national insurance.
+#     """
+#     take_home = getattr(income, "take_home_salary", 0)
+#     income_tax = getattr(income, "income_tax", 0)
+#     ni_due = getattr(income, "ni_due", 0)
+#     pie_data = pd.DataFrame(
+#         {
+#             "Component": ["Take-home", "Income Tax", "NI Contribution"],
+#             "Amount": [take_home, income_tax, ni_due],
+#         }
+#     )
+#     fig = px.pie(
+#         pie_data,
+#         names="Component",
+#         values="Amount",
+#         title="Income Breakdown",
+#         color_discrete_sequence=px.colors.sequential.Blues,
+#     )
+#     return fig
 
 
 def plot_post_retirement_withdrawals_todays(df: pd.DataFrame) -> go.Figure:
