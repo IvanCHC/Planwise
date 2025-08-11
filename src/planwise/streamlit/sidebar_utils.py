@@ -142,6 +142,28 @@ class ContributionSettings:
 
 
 @dataclass
+class AccountBalances:
+    """Data class to hold account balances.
+
+    Attributes
+    ----------
+    lisa_balance: float
+        The current balance in the Lifetime ISA (LISA).
+    isa_balance: float
+        The current balance in the Individual Savings Account (ISA).
+    sipp_balance: float
+        The current balance in the Self-Invested Personal Pension (SIPP).
+    workplace_pension_balance: float
+        The current balance in the workplace pension.
+    """
+
+    lisa_balance: float
+    isa_balance: float
+    sipp_balance: float
+    workplace_pension_balance: float
+
+
+@dataclass
 class Post50ContributionSettings:
     """Data class to hold post-50 contribution settings.
 
@@ -244,6 +266,9 @@ class ProfileSettings:
         The personal details of the user, including salary and take-home salary.
     contribution_settings : ContributionSettings
         The contribution settings for the user, including rates and amounts.
+    account_balances : AccountBalances
+        The current balances of the user's accounts, including LISA, ISA, SIPP, and
+        workplace pension.
     post_50_contribution_settings : Post50ContributionSettings
         The contribution settings for the user after age 50.
     expected_returns_and_inflation : ExpectedReturnsAndInflation
@@ -257,6 +282,7 @@ class ProfileSettings:
     qualifying_earnings: "QualifyingEarnings"
     personal_details: "PersonalDetails"
     contribution_settings: "ContributionSettings"
+    account_balances: "AccountBalances"
     post_50_contribution_settings: "Post50ContributionSettings"
     expected_returns_and_inflation: "ExpectedReturnsAndInflation"
     post_retirement_settings: "PostRetirementSettings"

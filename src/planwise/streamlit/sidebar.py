@@ -11,6 +11,7 @@ import streamlit as st
 import planwise as pw
 
 from .sidebar_utils import (
+    AccountBalances,
     ContributionSettings,
     ExpectedReturnsAndInflation,
     PersonalDetails,
@@ -219,22 +220,24 @@ def _contribution_rates_section(
                 workplace_er_rate, workplace_er_contribution = 0.0, 0.0
                 workplace_ee_rate, workplace_ee_contribution = 0.0, 0.0
             else:
-                workplace_er_rate, workplace_er_contribution = (
-                    workplace_er_contribution_rate(
-                        tax_year,
-                        personal_details,
-                        qualifying_earnings,
-                        use_exact_amount,
-                    )
+                (
+                    workplace_er_rate,
+                    workplace_er_contribution,
+                ) = workplace_er_contribution_rate(
+                    tax_year,
+                    personal_details,
+                    qualifying_earnings,
+                    use_exact_amount,
                 )
-                workplace_ee_rate, workplace_ee_contribution = (
-                    workplace_ee_contribution_rate(
-                        tax_year,
-                        personal_details,
-                        workplace_er_contribution,
-                        qualifying_earnings,
-                        use_exact_amount,
-                    )
+                (
+                    workplace_ee_rate,
+                    workplace_ee_contribution,
+                ) = workplace_ee_contribution_rate(
+                    tax_year,
+                    personal_details,
+                    workplace_er_contribution,
+                    qualifying_earnings,
+                    use_exact_amount,
                 )
                 total_workplace_contribution = (
                     workplace_er_contribution + workplace_ee_contribution * 1.25
@@ -347,6 +350,44 @@ def _contribution_rates_section(
         return contribution_settings
 
 
+def _account_balances_section() -> "AccountBalances":
+    with st.sidebar.expander("Account Balances", expanded=False):
+        lisa_balance = st.number_input(
+            "LISA Balance (£)",
+            min_value=0.0,
+            value=0.0,
+            step=1000.0,
+            key="lisa_balance",
+        )
+        isa_balance = st.number_input(
+            "ISA Balance (£)",
+            min_value=0.0,
+            value=0.0,
+            step=1000.0,
+            key="isa_balance",
+        )
+        sipp_balance = st.number_input(
+            "SIPP Balance (£)",
+            min_value=0.0,
+            value=0.0,
+            step=1000.0,
+            key="sipp_balance",
+        )
+        workpace_pension_balance = st.number_input(
+            "Workplace Pension Balance (£)",
+            min_value=0.0,
+            value=0.0,
+            step=1000.0,
+            key="workplace_balance",
+        )
+    return AccountBalances(
+        lisa_balance=lisa_balance,
+        isa_balance=isa_balance,
+        sipp_balance=sipp_balance,
+        workplace_pension_balance=workpace_pension_balance,
+    )
+
+
 def _post50_lisa_section(
     tax_year: int, contribution_settings: "ContributionSettings"
 ) -> "Post50ContributionSettings":
@@ -368,7 +409,7 @@ def _post50_lisa_section(
     Post50ContributionSettings
         A dataclass instance containing the post-50 LISA redirection settings.
     """
-    with st.sidebar.expander("Post-50 LISA redirection", expanded=False):
+    with st.sidebar.expander("Post-50 LISA Redirection", expanded=False):
         with st.container(horizontal_alignment="right"):
             use_exact_amount = st.toggle(
                 "Input exact amount?", value=False, key="use_exact_amount_post50"
@@ -657,6 +698,7 @@ def sidebar_inputs() -> "ProfileSettings":
     contribution_settings = _contribution_rates_section(
         tax_year, personal_details, qualifying_earnings
     )
+    account_balances = _account_balances_section()
     post_50_contribution_settings = _post50_lisa_section(
         tax_year, contribution_settings
     )
@@ -671,6 +713,7 @@ def sidebar_inputs() -> "ProfileSettings":
         personal_details=personal_details,
         qualifying_earnings=qualifying_earnings,
         contribution_settings=contribution_settings,
+        account_balances=account_balances,
         post_50_contribution_settings=post_50_contribution_settings,
         expected_returns_and_inflation=expected_returns_and_inflation,
         post_retirement_settings=post_retirement_settings,
