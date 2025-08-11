@@ -6,10 +6,17 @@ including Lifetime ISA (LISA), Stocks & Shares ISA, Self-Invested Personal
 Pension (SIPP) and workplace pensions.
 """
 
-from .core import IncomeBreakdown, project_post_retirement, project_retirement
+import os
+
+from .core import (
+    LIMITS_DB,
+    IncomeBreakdown,
+    project_post_retirement,
+    project_retirement,
+)
 from .ni import NICBand, calculate_ni
 from .profile import delete_profile, list_profiles, load_profile, save_profile
-from .tax import TaxBand, calculate_income_tax, get_tax_bands
+from .tax import TAX_BANDS_DB, TaxBand, calculate_income_tax, get_tax_bands
 
 # -----------------------------------------------------------------------------
 # Optional plotting imports
@@ -35,8 +42,10 @@ except Exception:
     # do nothing except raise an informative ImportError when used.
     _PLOTTING_AVAILABLE = False
 
+PLANWISE_DIR = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR = os.path.dirname(PLANWISE_DIR)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Planwise Team"
 __all__ = [
     "project_retirement",
