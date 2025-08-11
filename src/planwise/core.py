@@ -840,9 +840,7 @@ def project_post_retirement(
     # Use overrides if provided, otherwise fall back to defaults
     sp_age = state_pension_age if state_pension_age is not None else sp_age_default
     sp_per_year = (
-        state_pension_amount
-        if state_pension_amount is not None
-        else sp_amount_default
+        state_pension_amount if state_pension_amount is not None else sp_amount_default
     )
     uprate_inflation = (
         uprate_state_pension
@@ -1014,7 +1012,9 @@ def project_post_retirement(
                     total_tax_paid_today += tax_due_today
                     remaining_net_to_fund_today -= net_taken_today
                     # Record the net withdrawal from this account (today's money)
-                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                    withdrawals_today[acc] = (
+                        withdrawals_today.get(acc, 0.0) + net_taken_today
+                    )
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
                 else:
@@ -1024,7 +1024,9 @@ def project_post_retirement(
                     pots[acc] -= net_taken_today * cumulative_inflation
                     remaining_net_to_fund_today -= net_taken_today
                     # Record the net withdrawal for this account
-                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                    withdrawals_today[acc] = (
+                        withdrawals_today.get(acc, 0.0) + net_taken_today
+                    )
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
 
@@ -1063,7 +1065,9 @@ def project_post_retirement(
                     total_tax_paid_today += tax_due_today
                     remaining_net_to_fund_today -= net_taken_today
                     # Record the net withdrawal for this account
-                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                    withdrawals_today[acc] = (
+                        withdrawals_today.get(acc, 0.0) + net_taken_today
+                    )
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
                 else:
@@ -1074,7 +1078,9 @@ def project_post_retirement(
                     pots[acc] -= net_taken_today * cumulative_inflation
                     remaining_net_to_fund_today -= net_taken_today
                     # Record the net withdrawal for this account
-                    withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                    withdrawals_today[acc] = (
+                        withdrawals_today.get(acc, 0.0) + net_taken_today
+                    )
                     if remaining_net_to_fund_today < 0.0:
                         remaining_net_to_fund_today = 0.0
                 if remaining_net_to_fund_today <= 1e-9:
@@ -1159,7 +1165,9 @@ def project_post_retirement(
                         total_tax_paid_today += tax_due_today
                         remaining_net_to_fund_today -= net_taken_today
                         # Record withdrawal
-                        withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                        withdrawals_today[acc] = (
+                            withdrawals_today.get(acc, 0.0) + net_taken_today
+                        )
                     else:
                         # Non-taxable account: take net share or available pot
                         max_net_today = pot_balance / cumulative_inflation
@@ -1168,7 +1176,9 @@ def project_post_retirement(
                             net_taken_today = max_net_today
                         pots[acc] -= net_taken_today * cumulative_inflation
                         remaining_net_to_fund_today -= net_taken_today
-                        withdrawals_today[acc] = withdrawals_today.get(acc, 0.0) + net_taken_today
+                        withdrawals_today[acc] = (
+                            withdrawals_today.get(acc, 0.0) + net_taken_today
+                        )
                     # If account still has funds, retain for further rounds
                     if pots.get(acc, 0.0) > 1e-9:
                         new_future_accounts.append(acc)
@@ -1202,7 +1212,9 @@ def project_post_retirement(
         record["Total Pot (Today's Money)"] = total_pot_todays
         # Record per-account withdrawals in today's money
         for acc in pots.keys():
-            record[f"Withdrawal {acc} (Today's Money)"] = withdrawals_today.get(acc, 0.0)
+            record[f"Withdrawal {acc} (Today's Money)"] = withdrawals_today.get(
+                acc, 0.0
+            )
         # Record shortfall and tax details
         record["Remaining Withdrawal Shortfall"] = shortfall
         record["Tax Paid on Withdrawals (Inflation Adjusted)"] = (
