@@ -179,31 +179,31 @@ class PostRetirementSettings:
 
     Attributes
     ----------
-    post_retirement_withdrawal_today: bool
-        Whether the user wants to withdraw today.
+    withdrawal_today_amount: float
+        The amount to withdraw today from the retirement accounts.
     expected_post_retirement_lisa_annual_return: float
-        The expected annual return rate for the LISA account in retirement.
+        The expected annual return rate for the LISA account after retirement.
     expected_post_retirement_isa_annual_return: float
-        The expected annual return rate for the ISA account in retirement.
-    expected_post_retirement_sipp_annual_return: float
-        The expected annual return rate for the SIPP account in retirement.
+        The expected annual return rate for the ISA account after retirement.
+    expected_post_retirement_pension_annual_return: float
+        The expected annual return rate for the pension account after retirement.
     postret_lisa_withdrawal_age: int
         The age at which the user plans to start withdrawing from the LISA account.
     postret_lisa_targeted_withdrawal_percentage: float
-        The percentage of the LISA account to withdraw at retirement.
+        The targeted percentage of the LISA account to withdraw after retirement.
     postret_isa_withdrawal_age: int
         The age at which the user plans to start withdrawing from the ISA account.
     postret_isa_targeted_withdrawal_percentage: float
-        The percentage of the ISA account to withdraw at retirement.
+        The targeted percentage of the ISA account to withdraw after retirement.
     postret_pension_withdrawal_age: int
         The age at which the user plans to start withdrawing from the pension account.
     postret_pension_targeted_withdrawal_percentage: float
-        The percentage of the pension account to withdraw at retirement.
+        The targeted percentage of the pension account to withdraw after retirement.
     """
-    post_retirement_withdrawal_today: bool
+    withdrawal_today_amount: float
     expected_post_retirement_lisa_annual_return: float
     expected_post_retirement_isa_annual_return: float
-    expected_post_retirement_sipp_annual_return: float
+    expected_post_retirement_pension_annual_return: float
     postret_lisa_withdrawal_age: int
     postret_lisa_targeted_withdrawal_percentage: float
     postret_isa_withdrawal_age: int
