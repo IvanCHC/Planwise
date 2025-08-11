@@ -11,6 +11,7 @@ import os
 from .core import (
     LIMITS_DB,
     IncomeBreakdown,
+    project_investment,
     project_post_retirement,
     project_retirement,
 )
