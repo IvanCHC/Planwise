@@ -527,7 +527,7 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             "Expected inflation rate (%)",
             0.0,
             0.2,
-            0.05,
+            0.025,
             step=0.001,
             key="inflation",
         )

@@ -72,7 +72,10 @@ def _render_investment_dataframe(dataframe: pd.DataFrame.style) -> None:
 
 def _render_portfolio_breakdown(dataframe: pd.DataFrame) -> None:
     st.subheader("Portfolio Breakdown")
-    final_values, precentage_plot, net_values, stack_bar_plot = st.columns([1, 1, 1, 1])
+    final_values, net_values, portfolio_breakdown, contributions_breakdown = st.columns(
+        [1, 1, 1, 1]
+    )
+
     lisa_balance = dataframe["LISA Balance"].iloc[-1]
     isa_balance = dataframe["ISA Balance"].iloc[-1]
     sipp_balance = dataframe["SIPP Balance"].iloc[-1]
@@ -88,18 +91,40 @@ def _render_portfolio_breakdown(dataframe: pd.DataFrame) -> None:
             "🏢 Workplace:",
             f"£{workplace_balance:,.0f} ({workplace_balance/total_balance:,.2%})",
         )
-        st.write("**Government Bonus & Tax Relief:**")
-        st.write("LISA Bonus:", f"£{dataframe['LISA Bonus'].iloc[0]:.2f}")
-        st.write("Pension Tax Relief:", f"£{dataframe['Tax Relief'].iloc[0]:.2f}")
-        st.write("Pension Tax Refund:", f"£{dataframe['Tax Refund'].iloc[0]:.2f}")
 
-    with precentage_plot:
+    lisa_net = dataframe["LISA Net Contribution"].iloc[-1]
+    isa_net = dataframe["ISA Net Contribution"].iloc[-1]
+    sipp_net = dataframe["SIPP Net Contribution"].iloc[-1]
+    workplace_net = dataframe["Workplace Net Contribution"].iloc[-1]
+    total_net = lisa_net + isa_net + sipp_net + workplace_net
+    with net_values:
+        st.write("**Net Contributions:**")
+        st.write("💰 LISA:", f"£{lisa_net:,.0f} ({lisa_net/total_net:.2%})")
+        st.write("💳 ISA:", f"£{isa_net:,.0f} ({isa_net/total_net:.2%})")
+        st.write("🏦 SIPP:", f"£{sipp_net:,.0f} ({sipp_net/total_net:.2%})")
+        st.write(
+            "🏢 Workplace:", f"£{workplace_net:,.0f} ({workplace_net/total_net:.2%})"
+        )
+
+    with portfolio_breakdown:
         st.write("**Portfolio Breakdown:**")
         breakdown = {
             "LISA": dataframe["LISA Balance"].iloc[-1],
             "ISA": dataframe["ISA Balance"].iloc[-1],
             "Workplace": dataframe["Workplace Balance"].iloc[-1],
             "SIPP": dataframe["SIPP Balance"].iloc[-1],
+        }
+        st.altair_chart(
+            pw.plotting.plot_portfolio_breakdown(breakdown), use_container_width=True
+        )
+
+    with contributions_breakdown:
+        st.write("**Net Contributions Breakdown:**")
+        breakdown = {
+            "LISA": dataframe["LISA Net Contribution"].iloc[-1],
+            "ISA": dataframe["ISA Net Contribution"].iloc[-1],
+            "Workplace": dataframe["Workplace Net Contribution"].iloc[-1],
+            "SIPP": dataframe["SIPP Net Contribution"].iloc[-1],
         }
         st.altair_chart(
             pw.plotting.plot_portfolio_breakdown(breakdown), use_container_width=True
