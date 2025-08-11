@@ -494,41 +494,41 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
         expected_lisa_annual_return = st.slider(
             "LISA expected annual return (%)",
             0.0,
-            20.0,
-            5.0,
-            step=0.1,
+            0.2,
+            0.05,
+            step=0.001,
             key="roi_lisa",
         )
         expected_isa_annual_return = st.slider(
             "ISA expected annual return (%)",
             0.0,
-            20.0,
-            5.0,
-            step=0.1,
+            0.2,
+            0.05,
+            step=0.001,
             key="roi_isa",
         )
         expected_sipp_annual_return = st.slider(
             "SIPP expected annual return (%)",
             0.0,
-            20.0,
-            5.0,
-            step=0.1,
+            0.2,
+            0.05,
+            step=0.001,
             key="roi_sipp",
         )
         expected_workplace_annual_return = st.slider(
             "Workplace pension expected annual return (%)",
             0.0,
-            20.0,
-            5.0,
-            step=0.1,
+            0.2,
+            0.05,
+            step=0.001,
             key="roi_workplace",
         )
         expected_inflation = st.slider(
             "Expected inflation rate (%)",
             0.0,
-            10.0,
-            2.0,
-            step=0.1,
+            0.2,
+            0.05,
+            step=0.001,
             key="inflation",
         )
         return ExpectedReturnsAndInflation(
@@ -560,25 +560,25 @@ def _post_retirement_section(
             expected_post_retirement_lisa_annual_return = st.slider(
                 "LISA expected annual return (%)",
                 0.0,
-                20.0,
+                0.2,
                 pre_retirement_returns.expected_lisa_annual_return,
-                step=0.1,
+                step=0.001,
                 key="postret_roi_lisa",
             )
             expected_post_retirement_isa_annual_return = st.slider(
                 "ISA expected annual return (%)",
                 0.0,
-                20.0,
+                0.2,
                 pre_retirement_returns.expected_isa_annual_return,
-                step=0.1,
+                step=0.001,
                 key="postret_roi_isa",
             )
             expected_post_retirement_pension_annual_return = st.slider(
                 "Pension expected annual return (%)",
                 0.0,
-                20.0,
+                0.2,
                 pre_retirement_returns.expected_sipp_annual_return,
-                step=0.1,
+                step=0.001,
                 key="postret_roi_pension",
             )
 
