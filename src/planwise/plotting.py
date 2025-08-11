@@ -838,3 +838,45 @@ def plot_accumulated_tax_paid_postret(df: pd.DataFrame) -> go.Figure:
         margin=dict(r=120),
     )
     return fig
+
+
+def plot_portfolio_breakdown(breakdown: dict[str, float]) -> alt.Chart:
+    """Plot a donut chart showing the portfolio breakdown by asset class using Altair."""
+    # Handle empty input
+    if not breakdown:
+        return alt.Chart(pd.DataFrame({"Asset Class": [], "Value": []})).mark_arc()
+
+    data = pd.DataFrame(
+        {"Asset Class": list(breakdown.keys()), "Value": list(breakdown.values())}
+    )
+    data["Percent"] = data["Value"] / data["Value"].sum()
+
+    # Donut chart
+    chart = (
+        alt.Chart(data)
+        .mark_arc(innerRadius=70, outerRadius=130)
+        .encode(
+            theta=alt.Theta("Value:Q", stack=True, title=""),
+            color=alt.Color("Asset Class:N", title="Asset Class", legend=None),
+            tooltip=[
+                alt.Tooltip("Asset Class:N"),
+                alt.Tooltip("Value:Q"),
+                alt.Tooltip("Percent:Q", format=".1%"),
+            ],
+        )
+        .properties(width=300, height=300)
+    )
+
+    # Labels around the arcs (skip tiny slices to avoid clutter)
+    labels = (
+        alt.Chart(data)
+        .transform_filter("datum.Percent >= 0.03")
+        .mark_text(radius=100, radiusOffset=0, fontSize=8)
+        .encode(
+            theta=alt.Theta("Value:Q", stack=True),
+            text=alt.Text("Asset Class:N"),
+            color=alt.value("black"),
+        )
+    )
+
+    return chart + labels
