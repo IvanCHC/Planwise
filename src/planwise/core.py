@@ -1308,7 +1308,7 @@ class InvestmentSimulator:
         lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
             "lisa_maximum_contribution_age", 50
         )
-        if age > lisa_maximum_contribution_age:
+        if age >= lisa_maximum_contribution_age:
             post_50_lisa_to_isa = (
                 self.profile.post_50_contribution_settings.post_50_lisa_to_isa_contribution
             )
@@ -1337,7 +1337,7 @@ class InvestmentSimulator:
         lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
             "lisa_maximum_contribution_age", 50
         )
-        if age > lisa_maximum_contribution_age:
+        if age >= lisa_maximum_contribution_age:
             post_50_lisa_to_sipp = (
                 self.profile.post_50_contribution_settings.post_50_lisa_to_sipp_contribution
             )
