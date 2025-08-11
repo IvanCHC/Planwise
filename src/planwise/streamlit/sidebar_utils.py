@@ -2,6 +2,7 @@
 This module provides utility functions for configuring the Streamlit sidebar
 in the Planwise application.
 """
+
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -10,7 +11,9 @@ import streamlit as st
 import planwise as pw
 
 
-def get_qualifying_earnings_info(use_qualifying: bool, tax_year: int) -> "QualifyingEarnings":
+def get_qualifying_earnings_info(
+    use_qualifying: bool, tax_year: int
+) -> "QualifyingEarnings":
     """Get qualifying earnings information for the specified tax year.
 
     Parameters
@@ -29,7 +32,10 @@ def get_qualifying_earnings_info(use_qualifying: bool, tax_year: int) -> "Qualif
     qualifying_upper = limits_db["qualifying_upper"]
     qualifying_lower = limits_db["qualifying_lower"]
     qualifying_earnings = qualifying_upper - qualifying_lower
-    return QualifyingEarnings(use_qualifying, qualifying_earnings, qualifying_upper, qualifying_lower)
+    return QualifyingEarnings(
+        use_qualifying, qualifying_earnings, qualifying_upper, qualifying_lower
+    )
+
 
 @dataclass
 class QualifyingEarnings:
@@ -46,6 +52,7 @@ class QualifyingEarnings:
     qualifying_lower : float
         The lower bound for qualifying earnings.
     """
+
     use_qualifying_earnings: bool
     qualifying_earnings: float
     qualifying_upper: float
@@ -71,12 +78,14 @@ class PersonalDetails:
     income_tax : float
         The estimated income tax due.
     """
+
     current_age: int
     retirement_age: int
     salary: float
     take_home_salary: float
     ni_contribution: float
     income_tax: float
+
 
 @dataclass
 class ContributionSettings:
@@ -114,6 +123,7 @@ class ContributionSettings:
     total_pension_contribution: float
         The total pension contribution made by the user across pension accounts.
     """
+
     workplace_er_rate: float
     workplace_er_contribution: float
     workplace_ee_rate: float
@@ -130,6 +140,7 @@ class ContributionSettings:
     total_net_contribution: float
     total_pension_contribution: float
 
+
 @dataclass
 class Post50ContributionSettings:
     """Data class to hold post-50 contribution settings.
@@ -145,10 +156,12 @@ class Post50ContributionSettings:
     post_50_lisa_to_sipp_contribution: float
         The amount redirected from LISA to SIPP after age 50.
     """
+
     post_50_lisa_to_isa_rate: float
     post_50_lisa_to_isa_contribution: float
     post_50_lisa_to_sipp_rate: float
     post_50_lisa_to_sipp_contribution: float
+
 
 @dataclass
 class ExpectedReturnsAndInflation:
@@ -167,11 +180,13 @@ class ExpectedReturnsAndInflation:
     expected_inflation: float
         The expected annual inflation rate.
     """
+
     expected_lisa_annual_return: float
     expected_isa_annual_return: float
     expected_sipp_annual_return: float
     expected_workplace_annual_return: float
     expected_inflation: float
+
 
 @dataclass
 class PostRetirementSettings:
@@ -200,6 +215,7 @@ class PostRetirementSettings:
     postret_pension_targeted_withdrawal_percentage: float
         The targeted percentage of the pension account to withdraw after retirement.
     """
+
     withdrawal_today_amount: float
     expected_post_retirement_lisa_annual_return: float
     expected_post_retirement_isa_annual_return: float
@@ -210,6 +226,7 @@ class PostRetirementSettings:
     postret_isa_targeted_withdrawal_percentage: float
     postret_pension_withdrawal_age: int
     postret_pension_targeted_withdrawal_percentage: float
+
 
 @dataclass
 class ProfileSettings:
@@ -234,6 +251,7 @@ class ProfileSettings:
     post_retirement_settings : PostRetirementSettings
         The post-retirement settings for the user, including withdrawal strategies.
     """
+
     tax_year: int
     scotland: bool
     qualifying_earnings: "QualifyingEarnings"
@@ -244,7 +262,12 @@ class ProfileSettings:
     post_retirement_settings: "PostRetirementSettings"
 
 
-def lisa_contribution_rate(tax_year: int, take_home_salary: float, total_contribution: float, use_exact_amount: bool = False) -> Tuple[float, float]:
+def lisa_contribution_rate(
+    tax_year: int,
+    take_home_salary: float,
+    total_contribution: float,
+    use_exact_amount: bool = False,
+) -> Tuple[float, float]:
     """
     Subsection of _contribution_rates_section to handle LISA contributions.
 
@@ -268,7 +291,9 @@ def lisa_contribution_rate(tax_year: int, take_home_salary: float, total_contrib
     lisa_limit = pw.LIMITS_DB[str(tax_year)]["lisa_limit"]
     unused_salary = take_home_salary - total_contribution
     if not use_exact_amount:
-        max_lisa_rate = min(lisa_limit / take_home_salary, 1.0, unused_salary / take_home_salary)
+        max_lisa_rate = min(
+            lisa_limit / take_home_salary, 1.0, unused_salary / take_home_salary
+        )
         lisa_rate = st.slider(
             "LISA contribution %",
             0.0,
@@ -276,7 +301,8 @@ def lisa_contribution_rate(tax_year: int, take_home_salary: float, total_contrib
             0.0,
             step=0.001,
             key="lisa_rate",
-            help=f"LISA contribution limit is £{lisa_limit:,.0f}.")
+            help=f"LISA contribution limit is £{lisa_limit:,.0f}.",
+        )
         lisa_contribution = take_home_salary * lisa_rate
     else:
         lisa_contribution = st.number_input(
@@ -286,14 +312,22 @@ def lisa_contribution_rate(tax_year: int, take_home_salary: float, total_contrib
             value=0.0,
             step=100.0,
             key="lisa_contribution",
-            help=f"LISA contribution limit is £{lisa_limit:,.0f}."
+            help=f"LISA contribution limit is £{lisa_limit:,.0f}.",
         )
-        lisa_rate = lisa_contribution / take_home_salary if take_home_salary > 0 else 0.0
+        lisa_rate = (
+            lisa_contribution / take_home_salary if take_home_salary > 0 else 0.0
+        )
     st.write(f"**LISA contribution:** £{lisa_contribution:,.0f} ({lisa_rate*100:,.3}%)")
     return lisa_rate, lisa_contribution
 
 
-def isa_contribution_rate(tax_year: int, take_home_salary: float, lisa_contribution: float, total_contribution: float, use_exact_amount: bool = False) -> Tuple[float, float]:
+def isa_contribution_rate(
+    tax_year: int,
+    take_home_salary: float,
+    lisa_contribution: float,
+    total_contribution: float,
+    use_exact_amount: bool = False,
+) -> Tuple[float, float]:
     """
     Subsection of _contribution_rates_section to handle ISA contributions.
 
@@ -320,7 +354,11 @@ def isa_contribution_rate(tax_year: int, take_home_salary: float, lisa_contribut
     remaining_isa_allowance = max(isa_limit - lisa_contribution, 0.0)
     unused_salary = take_home_salary - total_contribution - lisa_contribution
     if not use_exact_amount:
-        max_isa_rate = min(remaining_isa_allowance / take_home_salary, 1.0, unused_salary / take_home_salary)
+        max_isa_rate = min(
+            remaining_isa_allowance / take_home_salary,
+            1.0,
+            unused_salary / take_home_salary,
+        )
         isa_rate = st.slider(
             "ISA contribution %",
             0.0,
@@ -328,7 +366,7 @@ def isa_contribution_rate(tax_year: int, take_home_salary: float, lisa_contribut
             0.0,
             step=0.001,
             key="isa_rate",
-            help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions."
+            help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions.",
         )
         isa_contribution = take_home_salary * isa_rate
     else:
@@ -339,14 +377,19 @@ def isa_contribution_rate(tax_year: int, take_home_salary: float, lisa_contribut
             value=0.0,
             step=100.0,
             key="isa_contribution",
-            help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions."
+            help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions.",
         )
         isa_rate = isa_contribution / take_home_salary if take_home_salary > 0 else 0.0
     st.write(f"**ISA contribution:** £{isa_contribution:,.0f} ({isa_rate*100:,.3}%)")
     return isa_rate, isa_contribution
 
 
-def workplace_er_contribution_rate(tax_year: int, personal_details: "PersonalDetails", qualifying_earnings: "QualifyingEarnings", use_exact_amount: bool = False) -> Tuple[float, float]:
+def workplace_er_contribution_rate(
+    tax_year: int,
+    personal_details: "PersonalDetails",
+    qualifying_earnings: "QualifyingEarnings",
+    use_exact_amount: bool = False,
+) -> Tuple[float, float]:
     """
     Subsection of _contribution_rates_section to handle workplace employer contributions.
 
@@ -379,13 +422,25 @@ def workplace_er_contribution_rate(tax_year: int, personal_details: "PersonalDet
             help="Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
         )
         if qualifying_earnings.use_qualifying_earnings:
-            potential_contribution_amount = personal_details.salary - qualifying_earnings.qualifying_lower if personal_details.salary < qualifying_earnings.qualifying_upper else qualifying_earnings.qualifying_earnings
-            workplace_employer_contribution = potential_contribution_amount * workplace_employer_rate
+            potential_contribution_amount = (
+                personal_details.salary - qualifying_earnings.qualifying_lower
+                if personal_details.salary < qualifying_earnings.qualifying_upper
+                else qualifying_earnings.qualifying_earnings
+            )
+            workplace_employer_contribution = (
+                potential_contribution_amount * workplace_employer_rate
+            )
         else:
-            workplace_employer_contribution = personal_details.salary * workplace_employer_rate
+            workplace_employer_contribution = (
+                personal_details.salary * workplace_employer_rate
+            )
     else:
         if qualifying_earnings.use_qualifying_earnings:
-            potential_contribution_amount = personal_details.salary - qualifying_earnings.qualifying_lower if personal_details.salary < qualifying_earnings.qualifying_upper else qualifying_earnings.qualifying_earnings
+            potential_contribution_amount = (
+                personal_details.salary - qualifying_earnings.qualifying_lower
+                if personal_details.salary < qualifying_earnings.qualifying_upper
+                else qualifying_earnings.qualifying_earnings
+            )
             workplace_employer_contribution = st.number_input(
                 "Workplace Pension (Employer) (£)",
                 min_value=0.0,
@@ -393,7 +448,7 @@ def workplace_er_contribution_rate(tax_year: int, personal_details: "PersonalDet
                 value=0.0,
                 step=100.0,
                 key="workplace_employer_contribution",
-                help=f"Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f})."
+                help=f"Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
             )
         else:
             workplace_employer_contribution = st.number_input(
@@ -403,14 +458,26 @@ def workplace_er_contribution_rate(tax_year: int, personal_details: "PersonalDet
                 value=0.0,
                 step=100.0,
                 key="workplace_employer_contribution",
-                help=f"Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f})."
+                help=f"Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
             )
-        workplace_employer_rate = workplace_employer_contribution / personal_details.salary if personal_details.salary > 0 else 0.0
-    st.write(f"**Workplace (ER) Pension:** £{workplace_employer_contribution:,.0f} ({workplace_employer_rate*100:,.4}%)")
+        workplace_employer_rate = (
+            workplace_employer_contribution / personal_details.salary
+            if personal_details.salary > 0
+            else 0.0
+        )
+    st.write(
+        f"**Workplace (ER) Pension:** £{workplace_employer_contribution:,.0f} ({workplace_employer_rate*100:,.4}%)"
+    )
     return workplace_employer_rate, workplace_employer_contribution
 
 
-def workplace_ee_contribution_rate(tax_year: int, personal_details: "PersonalDetails", workspace_er_contribution: float, qualifying_earnings: "QualifyingEarnings", use_exact_amount: bool = False) -> Tuple[float, float]:
+def workplace_ee_contribution_rate(
+    tax_year: int,
+    personal_details: "PersonalDetails",
+    workspace_er_contribution: float,
+    qualifying_earnings: "QualifyingEarnings",
+    use_exact_amount: bool = False,
+) -> Tuple[float, float]:
     """
     Subsection of _contribution_rates_section to handle workplace employee contributions.
 
@@ -435,19 +502,22 @@ def workplace_ee_contribution_rate(tax_year: int, personal_details: "PersonalDet
     """
     pension_allowance = pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
     unused_allowance = pension_allowance - workspace_er_contribution
-    tax_relief_rate = 1.25 # 25% tax relief on pension contributions
+    tax_relief_rate = 1.25  # 25% tax relief on pension contributions
     if not use_exact_amount:
         if qualifying_earnings.use_qualifying_earnings:
             max_workspace_ee_rate = min(
-                (personal_details.salary - qualifying_earnings.qualifying_lower) / qualifying_earnings.qualifying_earnings,
-                (personal_details.salary - qualifying_earnings.qualifying_lower) / personal_details.take_home_salary, # Cannot exceed take-home salary
-                1, # full qualifying_earnings.qualifying_earnings
+                (personal_details.salary - qualifying_earnings.qualifying_lower)
+                / qualifying_earnings.qualifying_earnings,
+                (personal_details.salary - qualifying_earnings.qualifying_lower)
+                / personal_details.take_home_salary,  # Cannot exceed take-home salary
+                1,  # full qualifying_earnings.qualifying_earnings
                 unused_allowance / (pension_allowance * tax_relief_rate),
             )
         else:
             max_workspace_ee_rate = min(
-                personal_details.take_home_salary / personal_details.salary, # Cannot exceed take-home salary
-                1, # full salary
+                personal_details.take_home_salary
+                / personal_details.salary,  # Cannot exceed take-home salary
+                1,  # full salary
                 unused_allowance / (personal_details.salary * tax_relief_rate),
             )
 
@@ -461,14 +531,23 @@ def workplace_ee_contribution_rate(tax_year: int, personal_details: "PersonalDet
             help="Employee contributions to workplace pension, exluding tax relief.",
         )
         if qualifying_earnings.use_qualifying_earnings:
-            potential_contribution_amount = personal_details.salary - qualifying_earnings.qualifying_lower if personal_details.salary < qualifying_earnings.qualifying_upper else qualifying_earnings.qualifying_earnings
-            workplace_employee_contribution = potential_contribution_amount * workplace_employee_rate
+            potential_contribution_amount = (
+                personal_details.salary - qualifying_earnings.qualifying_lower
+                if personal_details.salary < qualifying_earnings.qualifying_upper
+                else qualifying_earnings.qualifying_earnings
+            )
+            workplace_employee_contribution = (
+                potential_contribution_amount * workplace_employee_rate
+            )
         else:
-            workplace_employee_contribution = personal_details.salary * workplace_employee_rate
+            workplace_employee_contribution = (
+                personal_details.salary * workplace_employee_rate
+            )
     else:
         if qualifying_earnings.use_qualifying_earnings:
             max_workspace_ee_contribution = min(
-                personal_details.take_home_salary - qualifying_earnings.qualifying_lower,
+                personal_details.take_home_salary
+                - qualifying_earnings.qualifying_lower,
                 qualifying_earnings.qualifying_earnings,
                 unused_allowance / tax_relief_rate,
             )
@@ -486,12 +565,24 @@ def workplace_ee_contribution_rate(tax_year: int, personal_details: "PersonalDet
             key="workplace_employee_contribution",
             help="Employee contributions to workplace pension, excluding tax relief.",
         )
-        workplace_employee_rate = workplace_employee_contribution / personal_details.salary if personal_details.salary > 0 else 0.0
-    st.write(f"**Workplace (EE) Pension:** £{workplace_employee_contribution:,.0f} ({workplace_employee_rate*100:,.4}%)")
+        workplace_employee_rate = (
+            workplace_employee_contribution / personal_details.salary
+            if personal_details.salary > 0
+            else 0.0
+        )
+    st.write(
+        f"**Workplace (EE) Pension:** £{workplace_employee_contribution:,.0f} ({workplace_employee_rate*100:,.4}%)"
+    )
     return workplace_employee_rate, workplace_employee_contribution
 
 
-def sipp_contribution_rate(tax_year: int, personal_details: "PersonalDetails", total_workplace_contribution: float, total_contribution: float, use_exact_amount: bool = False) -> Tuple[float, float]:
+def sipp_contribution_rate(
+    tax_year: int,
+    personal_details: "PersonalDetails",
+    total_workplace_contribution: float,
+    total_contribution: float,
+    use_exact_amount: bool = False,
+) -> Tuple[float, float]:
     """
     Subsection of _contribution_rates_section to handle SIPP contributions.
 
@@ -511,7 +602,7 @@ def sipp_contribution_rate(tax_year: int, personal_details: "PersonalDetails", t
         max_sipp_rate = min(
             unused_salary / personal_details.take_home_salary,
             unused_allowance / (pension_allowance * tax_relief_rate),
-            1.0
+            1.0,
         )
         sipp_rate = st.slider(
             "SIPP contribution %",
@@ -520,14 +611,12 @@ def sipp_contribution_rate(tax_year: int, personal_details: "PersonalDetails", t
             0.0,
             step=0.001,
             key="sipp_rate",
-            help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions."
+            help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions.",
         )
         sipp_contribution = personal_details.take_home_salary * sipp_rate
     else:
         max_sipp_contribution = min(
-            unused_salary,
-            unused_allowance / tax_relief_rate,
-            pension_allowance
+            unused_salary, unused_allowance / tax_relief_rate, pension_allowance
         )
         sipp_contribution = st.number_input(
             "SIPP contribution (£)",
@@ -536,8 +625,12 @@ def sipp_contribution_rate(tax_year: int, personal_details: "PersonalDetails", t
             value=0.0,
             step=100.0,
             key="sipp_contribution",
-            help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions."
+            help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions.",
         )
-        sipp_rate = sipp_contribution / personal_details.take_home_salary if personal_details.take_home_salary > 0 else 0.0
+        sipp_rate = (
+            sipp_contribution / personal_details.take_home_salary
+            if personal_details.take_home_salary > 0
+            else 0.0
+        )
     st.write(f"**SIPP contribution:** £{sipp_contribution:,.0f} ({sipp_rate*100:,.3}%)")
     return sipp_rate, sipp_contribution

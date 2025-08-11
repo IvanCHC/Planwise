@@ -2,6 +2,7 @@
 This module provides utility functions for configuring the Streamlit sidebar
 in the Planwise application.
 """
+
 import os
 from typing import Any, Tuple
 
@@ -46,6 +47,7 @@ def _logo_section() -> None:
             unsafe_allow_html=True,
         )
 
+
 def _tax_year_selectbox() -> Any:
     """Let the user choose the tax year used for calculations.
 
@@ -70,6 +72,7 @@ def _tax_year_selectbox() -> Any:
         format_func=lambda y: f"{y}/{str(y+1)[-2:]}",
     )
 
+
 def _tax_settings_section() -> Tuple[bool, bool]:
     """Configure tax settings in the sidebar, including Scottish taxpayer status
     and whether to use qualifying earnings for workplace pension contributions.
@@ -86,9 +89,7 @@ def _tax_settings_section() -> Tuple[bool, bool]:
         scotland: bool = st.checkbox(
             "Scottish taxpayer?",
             value=False,
-            help=(
-                "Scottish taxpayers have different income tax bands."
-            ),
+            help=("Scottish taxpayers have different income tax bands."),
             key="scotland",
         )
         use_qualifying: bool = st.checkbox(
@@ -102,10 +103,11 @@ def _tax_settings_section() -> Tuple[bool, bool]:
         use_qualifying,
     )
 
+
 def _personal_details_section(
     tax_year: int,
     scotland: bool,
-) -> 'PersonalDetails':
+) -> "PersonalDetails":
     """Collect personal details such as age and salary from the user, and calculate
     estimated take-home salary, National Insurance contributions, and income tax.
 
@@ -168,8 +170,12 @@ def _personal_details_section(
     )
     return personal_details
 
-def _contribution_rates_section(tax_year: int, personal_details: "PersonalDetails",
-                                qualifying_earnings: "QualifyingEarnings") -> "ContributionSettings":
+
+def _contribution_rates_section(
+    tax_year: int,
+    personal_details: "PersonalDetails",
+    qualifying_earnings: "QualifyingEarnings",
+) -> "ContributionSettings":
     """Collect contribution rates for each tax wrapper based on user inputs.
 
     This function handles the complex logic of enforcing annual allowances and
@@ -193,16 +199,19 @@ def _contribution_rates_section(tax_year: int, personal_details: "PersonalDetail
     ContributionSettings
         A dataclass instance containing the contribution rates and other settings.
     """
-    with st.sidebar.expander(
-        "Contribution Settings", expanded=False
-    ):
+    with st.sidebar.expander("Contribution Settings", expanded=False):
         with st.container(horizontal_alignment="right"):
-            use_exact_amount = st.toggle("Input exact amount?", value=False, key="use_exact_amount")
+            use_exact_amount = st.toggle(
+                "Input exact amount?", value=False, key="use_exact_amount"
+            )
 
         total_net_contribution = 0.0
 
         with st.expander("Step 1. Workplace Contributions", expanded=False):
-            if qualifying_earnings.use_qualifying_earnings and personal_details.salary <= qualifying_earnings.qualifying_lower:
+            if (
+                qualifying_earnings.use_qualifying_earnings
+                and personal_details.salary <= qualifying_earnings.qualifying_lower
+            ):
                 st.warning(
                     "⚠️ Your salary is below the qualifying earnings threshold. "
                     "No workplace pension contributions can be made."
@@ -210,37 +219,78 @@ def _contribution_rates_section(tax_year: int, personal_details: "PersonalDetail
                 workplace_er_rate, workplace_er_contribution = 0.0, 0.0
                 workplace_ee_rate, workplace_ee_contribution = 0.0, 0.0
             else:
-                workplace_er_rate, workplace_er_contribution = workplace_er_contribution_rate(
-                    tax_year, personal_details, qualifying_earnings, use_exact_amount
+                workplace_er_rate, workplace_er_contribution = (
+                    workplace_er_contribution_rate(
+                        tax_year,
+                        personal_details,
+                        qualifying_earnings,
+                        use_exact_amount,
+                    )
                 )
-                workplace_ee_rate, workplace_ee_contribution = workplace_ee_contribution_rate(
-                    tax_year, personal_details, workplace_er_contribution, qualifying_earnings, use_exact_amount
+                workplace_ee_rate, workplace_ee_contribution = (
+                    workplace_ee_contribution_rate(
+                        tax_year,
+                        personal_details,
+                        workplace_er_contribution,
+                        qualifying_earnings,
+                        use_exact_amount,
+                    )
                 )
-                total_workplace_contribution = workplace_er_contribution + workplace_ee_contribution * 1.25  # 25% tax relief on employee contributions
-                allowance_usage = total_workplace_contribution / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
-                st.progress(allowance_usage, text=f"Pension Allowance Usage: £{total_workplace_contribution:.0f} ({allowance_usage*100:.3f}%)")
-                fund_usage = workplace_ee_contribution / personal_details.take_home_salary
-                st.progress(fund_usage, text=f"Fund Usage: £{workplace_ee_contribution:.0f} ({fund_usage*100:.3f}%)")
+                total_workplace_contribution = (
+                    workplace_er_contribution + workplace_ee_contribution * 1.25
+                )  # 25% tax relief on employee contributions
+                allowance_usage = (
+                    total_workplace_contribution
+                    / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
+                )
+                st.progress(
+                    allowance_usage,
+                    text=f"Pension Allowance Usage: £{total_workplace_contribution:.0f} ({allowance_usage*100:.3f}%)",
+                )
+                fund_usage = (
+                    workplace_ee_contribution / personal_details.take_home_salary
+                )
+                st.progress(
+                    fund_usage,
+                    text=f"Fund Usage: £{workplace_ee_contribution:.0f} ({fund_usage*100:.3f}%)",
+                )
                 total_net_contribution += workplace_ee_contribution
 
         with st.expander("Step 2. LISA & ISA Contribution", expanded=False):
-            if personal_details.take_home_salary-total_net_contribution <= 0:
+            if personal_details.take_home_salary - total_net_contribution <= 0:
                 st.warning(
                     "⚠️ You have insufficient take-home salary to contribute to LISA or ISA."
                 )
                 lisa_rate, lisa_contribution = 0.0, 0.0
                 isa_rate, isa_contribution = 0.0, 0.0
             else:
-                lisa_rate, lisa_contribution = lisa_contribution_rate(tax_year, personal_details.take_home_salary, total_net_contribution, use_exact_amount)
+                lisa_rate, lisa_contribution = lisa_contribution_rate(
+                    tax_year,
+                    personal_details.take_home_salary,
+                    total_net_contribution,
+                    use_exact_amount,
+                )
                 isa_rate, isa_contribution = isa_contribution_rate(
-                    tax_year, personal_details.take_home_salary, lisa_contribution, total_net_contribution, use_exact_amount
+                    tax_year,
+                    personal_details.take_home_salary,
+                    lisa_contribution,
+                    total_net_contribution,
+                    use_exact_amount,
                 )
                 total_isa_contribution = lisa_contribution + isa_contribution
                 total_net_contribution += total_isa_contribution
-                allowance_usage = total_isa_contribution / pw.LIMITS_DB[str(tax_year)]["isa_limit"]
-                st.progress(allowance_usage, text=f"ISA/LISA Allowance Usage: {allowance_usage*100:.3f}%")
+                allowance_usage = (
+                    total_isa_contribution / pw.LIMITS_DB[str(tax_year)]["isa_limit"]
+                )
+                st.progress(
+                    allowance_usage,
+                    text=f"ISA/LISA Allowance Usage: {allowance_usage*100:.3f}%",
+                )
                 fund_usage = total_net_contribution / personal_details.take_home_salary
-                st.progress(fund_usage, text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)")
+                st.progress(
+                    fund_usage,
+                    text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)",
+                )
 
         with st.expander("Step 3. SIPP Contributions", expanded=False):
             if personal_details.take_home_salary - total_net_contribution <= 0:
@@ -250,15 +300,32 @@ def _contribution_rates_section(tax_year: int, personal_details: "PersonalDetail
                 sipp_rate, sipp_contribution = 0.0, 0.0
             else:
                 sipp_rate, sipp_contribution = sipp_contribution_rate(
-                    tax_year, personal_details, total_workplace_contribution, total_net_contribution, use_exact_amount
+                    tax_year,
+                    personal_details,
+                    total_workplace_contribution,
+                    total_net_contribution,
+                    use_exact_amount,
                 )
-                total_sipp_contribution = sipp_contribution * 1.25  # 25% tax relief on employee contributions
+                total_sipp_contribution = (
+                    sipp_contribution * 1.25
+                )  # 25% tax relief on employee contributions
                 total_net_contribution += sipp_contribution
-                total_pension_contribution = total_workplace_contribution + total_sipp_contribution
-                allowance_usage = total_pension_contribution / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
-                st.progress(allowance_usage, text=f"Pension Allowance Usage: {allowance_usage*100:.3f}%")
+                total_pension_contribution = (
+                    total_workplace_contribution + total_sipp_contribution
+                )
+                allowance_usage = (
+                    total_pension_contribution
+                    / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
+                )
+                st.progress(
+                    allowance_usage,
+                    text=f"Pension Allowance Usage: {allowance_usage*100:.3f}%",
+                )
                 fund_usage = total_net_contribution / personal_details.take_home_salary
-                st.progress(fund_usage, text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)")
+                st.progress(
+                    fund_usage,
+                    text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)",
+                )
 
         contribution_settings = ContributionSettings(
             workplace_er_rate=workplace_er_rate,
@@ -280,7 +347,8 @@ def _contribution_rates_section(tax_year: int, personal_details: "PersonalDetail
         return contribution_settings
 
 
-def _post50_lisa_section(tax_year: int, contribution_settings: "ContributionSettings"
+def _post50_lisa_section(
+    tax_year: int, contribution_settings: "ContributionSettings"
 ) -> "Post50ContributionSettings":
     """Collect post-50 redirection preferences for LISA contributions.
 
@@ -302,7 +370,9 @@ def _post50_lisa_section(tax_year: int, contribution_settings: "ContributionSett
     """
     with st.sidebar.expander("Post-50 LISA redirection", expanded=False):
         with st.container(horizontal_alignment="right"):
-            use_exact_amount = st.toggle("Input exact amount?", value=False, key="use_exact_amount_post50")
+            use_exact_amount = st.toggle(
+                "Input exact amount?", value=False, key="use_exact_amount_post50"
+            )
 
         pension_allowance = pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
         if contribution_settings.total_pension_contribution >= pension_allowance:
@@ -316,9 +386,18 @@ def _post50_lisa_section(tax_year: int, contribution_settings: "ContributionSett
             redirectable_to_sipp = 0.0
         else:
             lisa_contribution = contribution_settings.lisa_contribution
-            unused_allowance = pension_allowance - contribution_settings.total_pension_contribution
+            unused_allowance = (
+                pension_allowance - contribution_settings.total_pension_contribution
+            )
             if not use_exact_amount:
-                minimum_lisa_redirectable = max((1 - (unused_allowance / lisa_contribution)) if lisa_contribution > unused_allowance else 0.0, 0.0)
+                minimum_lisa_redirectable = max(
+                    (
+                        (1 - (unused_allowance / lisa_contribution))
+                        if lisa_contribution > unused_allowance
+                        else 0.0
+                    ),
+                    0.0,
+                )
                 shift_lisa_to_isa = st.slider(
                     "Redirect LISA contribution to ISA (%)",
                     minimum_lisa_redirectable,
@@ -331,7 +410,9 @@ def _post50_lisa_section(tax_year: int, contribution_settings: "ContributionSett
                 redirectable_to_isa = shift_lisa_to_isa * lisa_contribution
                 redirectable_to_sipp = shift_lisa_to_sipp * lisa_contribution
             else:
-                minimum_lisa_redirectable = max(lisa_contribution - unused_allowance, 0.0)
+                minimum_lisa_redirectable = max(
+                    lisa_contribution - unused_allowance, 0.0
+                )
                 redirectable_to_isa = st.number_input(
                     "Redirect LISA contribution to ISA (£)",
                     min_value=minimum_lisa_redirectable,
@@ -343,8 +424,12 @@ def _post50_lisa_section(tax_year: int, contribution_settings: "ContributionSett
                 redirectable_to_sipp = lisa_contribution - redirectable_to_isa
                 shift_lisa_to_isa = redirectable_to_isa / lisa_contribution
                 shift_lisa_to_sipp = redirectable_to_sipp / lisa_contribution
-            st.write(f"**Redirectable to ISA**: £{redirectable_to_isa:.0f} ({shift_lisa_to_isa:.0%})")
-            st.write(f"**Redirectable to SIPP**: £{redirectable_to_sipp:.0f} ({shift_lisa_to_sipp:.0%})")
+            st.write(
+                f"**Redirectable to ISA**: £{redirectable_to_isa:.0f} ({shift_lisa_to_isa:.0%})"
+            )
+            st.write(
+                f"**Redirectable to SIPP**: £{redirectable_to_sipp:.0f} ({shift_lisa_to_sipp:.0%})"
+            )
 
     post50_contribution_settings = Post50ContributionSettings(
         post_50_lisa_to_isa_rate=shift_lisa_to_isa,
@@ -353,6 +438,7 @@ def _post50_lisa_section(tax_year: int, contribution_settings: "ContributionSett
         post_50_lisa_to_sipp_contribution=redirectable_to_sipp,
     )
     return post50_contribution_settings
+
 
 def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
     """Collect expected accounts annual returns and inflation rate from the user.
@@ -412,10 +498,13 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             expected_inflation=expected_inflation,
         )
 
-def _post_retirement_section(tax_year: int, personal_details: "PersonalDetails", pre_retirement_returns: "ExpectedReturnsAndInflation") -> "PostRetirementSettings":
-    """Collect post-retirement settings such as annual withdrawal amount in today's money.
 
-    """
+def _post_retirement_section(
+    tax_year: int,
+    personal_details: "PersonalDetails",
+    pre_retirement_returns: "ExpectedReturnsAndInflation",
+) -> "PostRetirementSettings":
+    """Collect post-retirement settings such as annual withdrawal amount in today's money."""
     with st.sidebar.expander("Post-Retirement Settings", expanded=False):
         withdrawal_today_amount = st.number_input(
             "Annual withdrawal in today's money (£)",
@@ -453,10 +542,10 @@ def _post_retirement_section(tax_year: int, personal_details: "PersonalDetails",
             )
 
         with st.expander("Withdrawal Settings", expanded=False):
-            st.write(
-                f"**Shortfalls will be evenly covered by other accounts.**"
-            )
-            lisa_minimum_withdrawal_age = pw.LIMITS_DB[str(tax_year)]["lisa_withdrawal_age"]
+            st.write(f"**Shortfalls will be evenly covered by other accounts.**")
+            lisa_minimum_withdrawal_age = pw.LIMITS_DB[str(tax_year)][
+                "lisa_withdrawal_age"
+            ]
             lisa_withdrawal_age = st.number_input(
                 "LISA withdrawal age",
                 min_value=lisa_minimum_withdrawal_age,
@@ -493,7 +582,9 @@ def _post_retirement_section(tax_year: int, personal_details: "PersonalDetails",
                 help="How much you want to withdraw from ISA per year as a percentage of the annual withdrawal amount.",
                 key="postret_isa_targeted_withdrawal_percentage",
             )
-            pension_withdrawal_age = pw.LIMITS_DB[str(tax_year)]["pension_withdrawal_age"]
+            pension_withdrawal_age = pw.LIMITS_DB[str(tax_year)][
+                "pension_withdrawal_age"
+            ]
             pension_withdrawal_age = st.number_input(
                 "Pension withdrawal age",
                 min_value=pension_withdrawal_age,
@@ -513,8 +604,14 @@ def _post_retirement_section(tax_year: int, personal_details: "PersonalDetails",
                 key="postret_pension_targeted_withdrawal_percentage",
             )
 
-            total_withdrawal_percentage = lisa_targeted_withdrawal_percentage + isa_targeted_withdrawal_percentage + pension_withdrawal_percentage
-            total_withdrawal_amount = withdrawal_today_amount * total_withdrawal_percentage
+            total_withdrawal_percentage = (
+                lisa_targeted_withdrawal_percentage
+                + isa_targeted_withdrawal_percentage
+                + pension_withdrawal_percentage
+            )
+            total_withdrawal_amount = (
+                withdrawal_today_amount * total_withdrawal_percentage
+            )
             if total_withdrawal_amount > withdrawal_today_amount:
                 st.warning(
                     f"⚠️ Total withdrawal amounts exceed the annual withdrawal amount by {total_withdrawal_percentage-1:.2%}. Please adjust."
@@ -544,7 +641,6 @@ def _post_retirement_section(tax_year: int, personal_details: "PersonalDetails",
     return post_retirement_settings
 
 
-
 def sidebar_inputs() -> "ProfileSettings":
     """Gather all user inputs from the sidebar.
 
@@ -558,10 +654,16 @@ def sidebar_inputs() -> "ProfileSettings":
     scotland, use_qualifying = _tax_settings_section()
     qualifying_earnings = get_qualifying_earnings_info(use_qualifying, tax_year)
     personal_details = _personal_details_section(tax_year, scotland)
-    contribution_settings = _contribution_rates_section(tax_year, personal_details, qualifying_earnings)
-    post_50_contribution_settings = _post50_lisa_section(tax_year, contribution_settings)
+    contribution_settings = _contribution_rates_section(
+        tax_year, personal_details, qualifying_earnings
+    )
+    post_50_contribution_settings = _post50_lisa_section(
+        tax_year, contribution_settings
+    )
     expected_returns_and_inflation = _returns_and_inflation_section()
-    post_retirement_settings = _post_retirement_section(tax_year, personal_details, expected_returns_and_inflation)
+    post_retirement_settings = _post_retirement_section(
+        tax_year, personal_details, expected_returns_and_inflation
+    )
 
     profile_settings = ProfileSettings(
         tax_year=tax_year,
