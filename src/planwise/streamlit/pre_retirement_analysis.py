@@ -189,9 +189,25 @@ def _render_annual_salary_and_contributions(dataframe: pd.DataFrame) -> None:
         )
 
 
+def _render_growth_breakdown(dataframe: pd.DataFrame) -> None:
+    st.subheader("Growth Breakdown and Visualisation")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.altair_chart(
+            pw.plotting.plot_annual_contribution_chart(dataframe),
+            use_container_width=True,
+        )
+    with col2:
+        st.altair_chart(
+            pw.plotting.plot_growth_projection_chart(dataframe),
+            use_container_width=True,
+        )
+
+
 def render_pre_retirement_analysis(dataframe: pd.DataFrame) -> None:
     _render_portfilio_statistics(dataframe)
     _render_annual_salary_and_contributions(dataframe)
     _render_portfolio_breakdown(dataframe)
     dataframe_styled = _style_dataframe(dataframe)
     _render_investment_dataframe(dataframe_styled)
+    _render_growth_breakdown(dataframe)

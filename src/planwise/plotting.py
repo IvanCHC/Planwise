@@ -875,3 +875,67 @@ def plot_pie_chart_breakdown(breakdown: dict[str, float]) -> alt.Chart:
     )
 
     return chart + labels
+
+
+def plot_annual_contribution_chart(dataframe: pd.DataFrame) -> alt.Chart:
+    data = dataframe.melt(
+        id_vars=["Age"],
+        value_vars=[
+            "LISA Net",
+            "ISA Net",
+            "SIPP Net",
+            "Workplace EE Net",
+        ],
+        var_name="Account",
+        value_name="Net Contribution",
+    )
+    data["Account"] = data["Account"].str.replace(" Net", "", regex=False)
+    data["Account"] = data["Account"].str.replace(" EE", "", regex=False)
+    title = "Net contributions by account (share of total)"
+    if data.empty:
+        return alt.Chart(pd.DataFrame({"Age": [], "Net Contribution": []})).mark_bar()
+    chart = (
+        alt.Chart(data)
+        .mark_bar()
+        .encode(
+            x=alt.X("Age:O", title="Age"),
+            y=alt.Y(
+                "Net Contribution:Q", stack="normalize", title="Contribution share"
+            ),
+            color=alt.Color("Account:N", title="Account"),
+            tooltip=["Account", "Net Contribution"],
+        )
+        .properties(title=title)
+    )
+    return chart
+
+
+def plot_growth_projection_chart(dataframe: pd.DataFrame) -> alt.Chart:
+    data = dataframe.melt(
+        id_vars=["Age"],
+        value_vars=[
+            "Portfolio Balance",
+            "LISA Balance",
+            "ISA Balance",
+            "SIPP Balance",
+            "Workplace Balance",
+        ],
+        var_name="Account",
+        value_name="Value",
+    )
+    data["Account"] = data["Account"].str.replace(" Balance", "", regex=False)
+    data["Account"] = data["Account"].str.replace("Portfolio", "Total", regex=False)
+    if data.empty:
+        return alt.Chart(pd.DataFrame({"Age": [], "Value": []})).mark_line()
+    title = "Portfolio growth projection by account over time"
+    chart = (
+        alt.Chart(data)
+        .mark_line()
+        .encode(
+            x=alt.X("Age:O", title="Age"),
+            y=alt.Y("Value:Q", title="Amount (£)", stack=None),
+            color=alt.Color("Account:N", title="Account"),
+            tooltip=["Account", "Value"],
+        )
+    ).properties(title=title)
+    return chart
