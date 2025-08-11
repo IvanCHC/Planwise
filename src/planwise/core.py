@@ -1401,7 +1401,9 @@ class InvestmentSimulator:
 
         self._lisa_gross_contribution += record.get("LISA Gross", 0.0)
         self._isa_gross_contribution += record.get("ISA Gross", 0.0)
-        self._workplace_gross_contribution += record.get("Workplace EE Gross", 0.0)
+        self._workplace_gross_contribution += record.get(
+            "Workplace EE Gross", 0.0
+        ) + record.get("Workplace ER", 0.0)
         self._sipp_gross_contribution += record.get("SIPP Gross", 0.0)
 
         portfilo_balance = (
@@ -1423,6 +1425,20 @@ class InvestmentSimulator:
             + self._sipp_gross_contribution
         )
 
+        annual_net_contribution = (
+            record.get("LISA Net", 0.0)
+            + record.get("ISA Net", 0.0)
+            + record.get("Workplace EE Net", 0.0)
+            + record.get("SIPP Net", 0.0)
+        )
+        annual_gross_contribution = (
+            record.get("LISA Gross", 0.0)
+            + record.get("ISA Gross", 0.0)
+            + record.get("Workplace EE Gross", 0.0)
+            + record.get("SIPP Gross", 0.0)
+            + record.get("Workplace ER", 0.0)
+        )
+
         return {
             "LISA Balance": self._lisa_balance,
             "ISA Balance": self._isa_balance,
@@ -1439,6 +1455,8 @@ class InvestmentSimulator:
             "Portfolio Balance": portfilo_balance,
             "Portfolio Net Contribution": portfilo_net_contribution,
             "Portfolio Gross Contribution": portfilo_gross_contribution,
+            "Annual Net Contribution": annual_net_contribution,
+            "Annual Gross Contribution": annual_gross_contribution,
         }
 
 

@@ -60,6 +60,8 @@ def _style_dataframe(df: pd.DataFrame) -> pd.DataFrame.style:
             "Portfolio Balance": "£{:,.0f}",
             "Portfolio Net Contribution": "£{:,.0f}",
             "Portfolio Gross Contribution": "£{:,.0f}",
+            "Annual Net Contribution": "£{:,.0f}",
+            "Annual Gross Contribution": "£{:,.0f}",
         }
     )
 
@@ -115,7 +117,7 @@ def _render_portfolio_breakdown(dataframe: pd.DataFrame) -> None:
             "SIPP": dataframe["SIPP Balance"].iloc[-1],
         }
         st.altair_chart(
-            pw.plotting.plot_portfolio_breakdown(breakdown), use_container_width=True
+            pw.plotting.plot_pie_chart_breakdown(breakdown), use_container_width=True
         )
 
     with contributions_breakdown:
@@ -127,12 +129,69 @@ def _render_portfolio_breakdown(dataframe: pd.DataFrame) -> None:
             "SIPP": dataframe["SIPP Net Contribution"].iloc[-1],
         }
         st.altair_chart(
-            pw.plotting.plot_portfolio_breakdown(breakdown), use_container_width=True
+            pw.plotting.plot_pie_chart_breakdown(breakdown), use_container_width=True
+        )
+
+
+def _render_annual_salary_and_contributions(dataframe: pd.DataFrame) -> None:
+    st.subheader("Annual Salary & Contribution Breakdown")
+
+    option = st.selectbox(
+        "Select breakdown year:",
+        ("Pre-50 Breakdown", "Post-50 Breakdown"),
+        key="breakdown_year_selectbox",
+    )
+
+    if option == "Pre-50 Breakdown":
+        row = dataframe.iloc[0]
+    else:
+        post50_rows = dataframe[dataframe["Age"] >= 50]
+        if not post50_rows.empty:
+            row = post50_rows.iloc[0]
+        else:
+            row = dataframe.iloc[-1]
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.write("**Salary Breakdown:**")
+        st.write(f"Gross Salary: £{row.get('Salary', 0):,.0f}")
+        st.write(f"Take-home: £{row.get('Take Home Salary', 0):,.0f}")
+        st.write(f"Income Tax: £{row.get('Income Tax', 0):,.0f}")
+        st.write(f"NI Contribution: £{row.get('NI Contribution', 0):,.0f}")
+    with col2:
+        st.write("**Net Contributions Breakdown:**")
+        st.write(f"LISA Net: £{row.get('LISA Net', 0):,.0f}")
+        st.write(f"ISA Net: £{row.get('ISA Net', 0):,.0f}")
+        st.write(f"SIPP Net: £{row.get('SIPP Net', 0):,.0f}")
+        st.write(f"Workplace Net: £{row.get('Workplace EE Net', 0):,.0f}")
+        st.write(
+            f"Total Net Contribution: £{row.get('Annual Net Contribution', 0):,.0f}"
+        )
+    with col3:
+        st.write("**Others:**")
+        st.write(f"LISA Bonus: £{row.get('LISA Bonus', 0):,.0f}")
+        st.write(f"Tax Relief £{row.get('Tax Relief', 0):,.0f}")
+        st.write(f"Tax Refund: £{row.get('Tax Refund', 0):,.0f}")
+        st.write(
+            f"Total Gross Contribution: £{row.get('Annual Gross Contribution', 0):,.0f}"
+        )
+        st.write(
+            f"Actual Contribution Cost: £{row.get('Annual Gross Contribution', 0) - row.get('Tax Refund', 0.0):,.0f}"
+        )
+    with col4:
+        breakdown = {
+            "Take-home": row.get("Take Home Salary", 0),
+            "Income Tax": row.get("Income Tax", 0),
+            "NI Contribution": row.get("NI Contribution", 0),
+        }
+        st.altair_chart(
+            pw.plotting.plot_pie_chart_breakdown(breakdown), use_container_width=True
         )
 
 
 def render_pre_retirement_analysis(dataframe: pd.DataFrame) -> None:
     _render_portfilio_statistics(dataframe)
+    _render_annual_salary_and_contributions(dataframe)
     _render_portfolio_breakdown(dataframe)
     dataframe_styled = _style_dataframe(dataframe)
     _render_investment_dataframe(dataframe_styled)
