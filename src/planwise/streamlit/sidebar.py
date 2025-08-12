@@ -597,7 +597,7 @@ def _post_retirement_section(
                 key="postret_lisa_withdrawal_age",
             )
             lisa_targeted_withdrawal_percentage = st.slider(
-                "Targeted LISA withdrawal percentage (%)",
+                "LISA withdrawal percentage (%)",
                 0.0,
                 1.0,
                 0.0,
@@ -615,7 +615,7 @@ def _post_retirement_section(
                 key="postret_isa_withdrawal_age",
             )
             isa_targeted_withdrawal_percentage = st.slider(
-                "Targeted ISA withdrawal percentage (%)",
+                "ISA withdrawal percentage (%)",
                 0.0,
                 1.0,
                 0.0,
@@ -639,7 +639,7 @@ def _post_retirement_section(
                 key="postret_pension_withdrawal_age",
             )
             taxfree_pension_withdrawal_percentage = st.slider(
-                "Targeted Taxfree Pension withdrawal percentage (%)",
+                "Taxfree Pension withdrawal percentage (%)",
                 0.0,
                 1.0,
                 0.0,
@@ -664,7 +664,7 @@ def _post_retirement_section(
                 key="postret_taxable_pension_withdrawal_age",
             )
             taxable_pension_withdrawal_percentage = st.slider(
-                "Targeted Taxable Pension withdrawal percentage (%)",
+                "Taxable Pension withdrawal percentage (%)",
                 0.0,
                 1.0,
                 0.0,

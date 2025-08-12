@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, List
 
 import pandas as pd
+import streamlit as st
 
-from .tax import calculate_income_tax
+from .tax import calculate_gross_from_take_home, calculate_income_tax
 
 
 def load_state_pension_db() -> Any:
@@ -914,9 +915,337 @@ class RetirementSimulator:
             self._taxable_pension_balance / inflation_adjustment
         )
 
+        self._accounts: list[str] = [
+            "lisa",
+            "isa",
+            "taxfree_pension",
+            "taxable_pension",
+        ]
+
     def simulate(self) -> pd.DataFrame:
-        return project_investment(self.profile)
+        percentage = (
+            self.profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage
+            + self.profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage
+            + self.profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage
+            + self.profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage
+        )
+        if percentage != 1.0:
+            st.warning(
+                f"Targeted withdrawal percentages do not sum to 100%. "
+                f"Current sum is {percentage * 100:.2f}%. "
+                f"Expected to be 100%."
+            )
+            return pd.DataFrame()
+
+        simluation_years = self._simulation_end_age - self._retirement_age
+        records: list[dict[str, Any]] = []
+        for i in range(simluation_years):
+            record: dict[str, Any] = {}
+
+            age = self._retirement_age + i
+            inflation_adjustment = self._inflation_adjustment(age)
+            record["Age"] = age
+
+            record.update(self._calculate_withdrawal_amount(inflation_adjustment))
+            record.update(self._calculate_state_pension(age, inflation_adjustment))
+            record.update(
+                self._calculate_accounts_withdrawal_and_income_tax(
+                    age, inflation_adjustment, record
+                )
+            )
+
+            records.append(record)
+        return pd.DataFrame(records)
+
+    def _calculate_withdrawal_amount(
+        self, inflation_adjustment: float
+    ) -> dict[str, float]:
+        return {
+            "Withdrawal Today": self._annual_withdrawal,
+            "Withdrawal Inflation Adjusted": self._annual_withdrawal
+            * inflation_adjustment,
+        }
+
+    def _calculate_state_pension(
+        self, age: int, inflation_adjustment: float
+    ) -> dict[str, float]:
+        if age >= self._state_pension_age:
+            sp_infl_adj = self._state_pension_amount * inflation_adjustment
+            sp_todays = self._state_pension_amount
+        else:
+            sp_infl_adj = 0.0
+            sp_todays = 0.0
+        return {
+            "State Pension Today": sp_todays,
+            "State Pension Inflation Adjusted": sp_infl_adj,
+        }
+
+    def _calculate_accounts_withdrawal_and_income_tax(
+        self, age: int, inflation_adjustment: float, record: dict[str, float]
+    ) -> dict[str, float]:
+        targeted_amount = self._annual_withdrawal
+        withdraw_plan = self._get_withdraw_plan(age)
+        state_pension = record.get("State Pension Today", 0.0)
+
+        targeted_amount_left = targeted_amount - state_pension
+        if targeted_amount_left <= 0:
+            withdrawal_lisa = 0.0
+            withdrawal_isa = 0.0
+            withdrawal_taxfree_pension = 0.0
+            withdrawal_taxable_pension = 0.0
+        else:
+            withdrawal_lisa = withdraw_plan["lisa"] * targeted_amount_left
+            withdrawal_isa = withdraw_plan["isa"] * targeted_amount_left
+            withdrawal_taxfree_pension = (
+                withdraw_plan["taxfree_pension"] * targeted_amount_left
+            )
+            withdrawal_taxable_pension = (
+                withdraw_plan["taxable_pension"] * targeted_amount_left
+            )
+        withdrawal_taxable_pension_tax = calculate_gross_from_take_home(
+            withdrawal_taxable_pension,
+            self.profile.scotland,
+            self.tax_year,
+            state_pension,
+        )
+        income_tax = calculate_income_tax(
+            income=withdrawal_taxable_pension_tax + state_pension,
+            scotland=self.profile.scotland,
+            year=self.tax_year,
+        )
+        total_withdrawal = (
+            withdrawal_lisa
+            + withdrawal_isa
+            + withdrawal_taxfree_pension
+            + withdrawal_taxable_pension
+            + state_pension
+        )
+        total_withdrawal_tax = total_withdrawal + state_pension
+
+        shortfall_today = 0.0
+        account_flags = [False] * len(self._accounts)
+        if self._lisa_balance_todays >= withdrawal_lisa:
+            self._lisa_balance_todays -= withdrawal_lisa
+        else:
+            shortfall_today -= self._lisa_balance_todays - withdrawal_lisa
+            self._lisa_balance_todays = 0.0
+            account_flags[0] = True
+        if self._isa_balance_todays >= withdrawal_isa:
+            self._isa_balance_todays -= withdrawal_isa
+        else:
+            shortfall_today -= self._isa_balance_todays - withdrawal_isa
+            self._isa_balance_todays = 0.0
+            account_flags[1] = True
+        if self._taxfree_pension_balance_todays >= withdrawal_taxfree_pension:
+            self._taxfree_pension_balance_todays -= withdrawal_taxfree_pension
+        else:
+            shortfall_today -= (
+                self._taxfree_pension_balance_todays - withdrawal_taxfree_pension
+            )
+            self._taxfree_pension_balance_todays = 0.0
+            account_flags[2] = True
+        if self._taxable_pension_balance_todays >= withdrawal_taxable_pension:
+            self._taxable_pension_balance_todays -= withdrawal_taxable_pension
+        else:
+            shortfall_today -= (
+                self._taxable_pension_balance_todays - withdrawal_taxable_pension
+            )
+            self._taxable_pension_balance_todays = 0.0
+            account_flags[3] = True
+
+        available_accounts = len(account_flags) - sum(account_flags)
+        iter = 0
+        while available_accounts > 0 and shortfall_today > 0 and iter < 3:
+            shortfall_today_per_account = shortfall_today / available_accounts
+            for f, account in zip(account_flags, self._accounts):
+                if account == "lisa":
+                    if not f:
+                        if self._lisa_balance_todays >= shortfall_today_per_account:
+                            self._lisa_balance_todays -= shortfall_today_per_account
+                            shortfall_today -= shortfall_today_per_account
+                            withdrawal_isa += shortfall_today_per_account
+                        else:
+                            shortfall_today -= self._lisa_balance_todays
+                            withdrawal_isa += self._lisa_balance_todays
+                            self._lisa_balance_todays = 0.0
+                            account_flags[0] = True
+                elif account == "isa":
+                    if not f:
+                        if self._isa_balance_todays >= shortfall_today_per_account:
+                            self._isa_balance_todays -= shortfall_today_per_account
+                            shortfall_today -= shortfall_today_per_account
+                            withdrawal_isa += shortfall_today_per_account
+                        else:
+                            shortfall_today -= self._isa_balance_todays
+                            withdrawal_isa += self._isa_balance_todays
+                            self._isa_balance_todays = 0.0
+                            account_flags[1] = True
+                elif account == "taxfree_pension":
+                    if not f:
+                        if (
+                            self._taxfree_pension_balance_todays
+                            >= shortfall_today_per_account
+                        ):
+                            self._taxfree_pension_balance_todays -= (
+                                shortfall_today_per_account
+                            )
+                            shortfall_today -= shortfall_today_per_account
+                            withdrawal_taxfree_pension += shortfall_today_per_account
+                        else:
+                            shortfall_today -= self._taxfree_pension_balance_todays
+                            withdrawal_taxfree_pension += (
+                                self._taxfree_pension_balance_todays
+                            )
+                            self._taxfree_pension_balance_todays = 0.0
+                            account_flags[2] = True
+                elif account == "taxable_pension":
+                    if not f:
+                        if (
+                            self._taxable_pension_balance_todays
+                            >= shortfall_today_per_account
+                        ):
+                            self._taxable_pension_balance_todays -= (
+                                shortfall_today_per_account
+                            )
+                            shortfall_today -= shortfall_today_per_account
+                            withdrawal_taxable_pension += shortfall_today_per_account
+                        else:
+                            shortfall_today -= self._taxable_pension_balance_todays
+                            withdrawal_taxable_pension += (
+                                self._taxable_pension_balance_todays
+                            )
+                            self._taxable_pension_balance_todays = 0.0
+                            account_flags[3] = True
+            available_accounts = len(account_flags) - sum(account_flags)
+            iter += 1
+
+        self._lisa_balance_todays = self._lisa_balance_todays * (
+            1
+            + self.profile.post_retirement_settings.expected_post_retirement_lisa_annual_return
+        )
+        self._isa_balance_todays = self._isa_balance_todays * (
+            1
+            + self.profile.post_retirement_settings.expected_post_retirement_isa_annual_return
+        )
+        self._taxfree_pension_balance_todays = self._taxfree_pension_balance_todays * (
+            1
+            + self.profile.post_retirement_settings.expected_post_retirement_pension_annual_return
+        )
+        self._taxable_pension_balance_todays = self._taxable_pension_balance_todays * (
+            1
+            + self.profile.post_retirement_settings.expected_post_retirement_pension_annual_return
+        )
+        self._pension_balance_todays = (
+            self._taxfree_pension_balance_todays + self._taxable_pension_balance_todays
+        )
+
+        self._lisa_balance = self._lisa_balance_todays * inflation_adjustment
+        self._isa_balance = self._isa_balance_todays * inflation_adjustment
+        self._taxfree_pension_balance = (
+            self._taxfree_pension_balance_todays * inflation_adjustment
+        )
+        self._taxable_pension_balance = (
+            self._taxable_pension_balance_todays * inflation_adjustment
+        )
+        self._pension_balance = (
+            self._taxfree_pension_balance + self._taxable_pension_balance
+        )
+
+        return {
+            "Withdrawal LISA Today": withdrawal_lisa,
+            "Withdrawal ISA Today": withdrawal_isa,
+            "Withdrawal Tax-Free Pension Today": withdrawal_taxfree_pension,
+            "Withdrawal Taxable Pension Today": withdrawal_taxable_pension,
+            "Withdrawal LISA Inflation Adjusted": withdrawal_lisa
+            * inflation_adjustment,
+            "Withdrawal ISA Inflation Adjusted": withdrawal_isa * inflation_adjustment,
+            "Withdrawal Tax-Free Pension Inflation Adjusted": withdrawal_taxfree_pension
+            * inflation_adjustment,
+            "Withdrawal Taxable Pension Inflation Adjusted": withdrawal_taxable_pension
+            * inflation_adjustment,
+            "Income Tax Today": income_tax,
+            "Income Tax Inflation Adjusted": income_tax * inflation_adjustment,
+            "Toal Withdrawal Today": total_withdrawal,
+            "Total Withdrawal Inflation Adjusted": total_withdrawal
+            * inflation_adjustment,
+            "Total Withdrawal Tax Today": total_withdrawal_tax,
+            "Total Withdrawal Tax Inflation Adjusted": total_withdrawal_tax
+            * inflation_adjustment,
+            "Shortfall Today": shortfall_today,
+            "Shortfall Inflation Adjusted": shortfall_today * inflation_adjustment,
+            "LISA Balance Today": self._lisa_balance_todays,
+            "ISA Balance Today": self._isa_balance_todays,
+            "Tax-Free Pension Balance Today": self._taxfree_pension_balance_todays,
+            "Taxable Pension Balance Today": self._taxable_pension_balance_todays,
+            "LISA Balance Inflation Adjusted": self._lisa_balance,
+            "ISA Balance Inflation Adjusted": self._isa_balance,
+            "Tax-Free Pension Balance Inflation Adjusted": self._taxfree_pension_balance,
+            "Taxable Pension Balance Inflation Adjusted": self._taxable_pension_balance,
+            "Pension Balance Today": self._pension_balance_todays,
+            "Pension Balance Inflation Adjusted": self._pension_balance,
+        }
+
+    def _get_withdraw_plan(self, age: int) -> dict[str, float]:
+        retirement_settings = {
+            "lisa": {
+                "age": self.profile.post_retirement_settings.postret_lisa_withdrawal_age,
+                "percentage": self.profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage,
+                "redistribute": age
+                < self.profile.post_retirement_settings.postret_lisa_withdrawal_age,
+            },
+            "isa": {
+                "age": self.profile.post_retirement_settings.postret_isa_withdrawal_age,
+                "percentage": self.profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage,
+                "redistribute": age
+                < self.profile.post_retirement_settings.postret_isa_withdrawal_age,
+            },
+            "taxfree_pension": {
+                "age": self.profile.post_retirement_settings.postret_taxfree_pension_withdrawal_age,
+                "percentage": self.profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage,
+                "redistribute": age
+                < self.profile.post_retirement_settings.postret_taxfree_pension_withdrawal_age,
+            },
+            "taxable_pension": {
+                "age": self.profile.post_retirement_settings.postret_taxable_pension_withdrawal_age,
+                "percentage": self.profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage,
+                "redistribute": age
+                < self.profile.post_retirement_settings.postret_taxable_pension_withdrawal_age,
+            },
+        }
+
+        account_flags = [False] * len(self._accounts)
+        for i, account in enumerate(self._accounts):
+            account_flags[i] = bool(retirement_settings[account]["redistribute"])
+
+        plan = {}
+        unavailable_accounts = sum(account_flags)
+        redistribution_size = 0.0
+        for f, account in zip(account_flags, self._accounts):
+            if f:
+                redistribution_size += retirement_settings[account]["percentage"]
+        redistribution_size_per_account = (
+            redistribution_size / (len(self._accounts) - unavailable_accounts)
+            if unavailable_accounts > 0
+            else 0.0
+        )
+
+        for f, account in zip(account_flags, self._accounts):
+            if not f:
+                plan[account] = (
+                    retirement_settings[account]["percentage"]
+                    + redistribution_size_per_account
+                )
+            else:
+                plan[account] = 0.0
+        return plan
 
     def _inflation_adjustment(self, age: int) -> float:
         years = age - self._current_age
         return (1 + self._inflation) ** years
+
+
+def project_retirement(
+    profile: "ProfileSettings", investment_dataframe: pd.DataFrame
+) -> pd.DataFrame:
+    simulator = RetirementSimulator(profile, investment_dataframe)
+    return simulator.simulate()
