@@ -242,11 +242,6 @@ class InvestmentSimulator:
         }
 
 
-def project_investment(profile: "ProfileSettings") -> pd.DataFrame:
-    simulator = InvestmentSimulator(profile)
-    return simulator.simulate()
-
-
 class RetirementSimulator:
     def __init__(
         self, profile: "ProfileSettings", investment_dataframe: pd.DataFrame
@@ -654,6 +649,11 @@ class RetirementSimulator:
     def _inflation_adjustment(self, age: int) -> float:
         years = age - self._current_age
         return (1 + self._inflation) ** years
+
+
+def project_investment(profile: "ProfileSettings") -> pd.DataFrame:
+    simulator = InvestmentSimulator(profile)
+    return simulator.simulate()
 
 
 def project_retirement(

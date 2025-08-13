@@ -10,7 +10,7 @@ from typing import Any
 from .databases import NI_BANDS_DB
 
 
-def get_ni_bands(year: int = 2025, category: str = "category_a") -> Any:
+def _get_ni_bands(year: int = 2025, category: str = "category_a") -> Any:
     """
     Return the National Insurance bands for the given year and category.
     Args:
@@ -45,7 +45,7 @@ def calculate_ni(
     """
     if income <= 0:
         return 0.0
-    bands = get_ni_bands(year, category)
+    bands = _get_ni_bands(year, category)
     ni_due = 0.0
     previous_threshold = 0.0
 

@@ -7,7 +7,12 @@ and loading of the tax bands database.
 
 import pytest
 
-from planwise.tax import TaxBand, calculate_income_tax, get_tax_bands, load_tax_bands_db
+from planwise.tax import (
+    TaxBand,
+    _get_tax_bands,
+    calculate_income_tax,
+    load_tax_bands_db,
+)
 
 
 class TestTaxBand:
@@ -33,7 +38,7 @@ class TestGetTaxBands:
         """
         Test getting rest-of-UK tax bands and their structure.
         """
-        bands, personal_allowance = get_tax_bands(scotland=False, year=2025)
+        bands, personal_allowance = _get_tax_bands(scotland=False, year=2025)
 
         assert personal_allowance == 12_570.0
         assert len(bands) == 4
@@ -52,7 +57,7 @@ class TestGetTaxBands:
         """
         Test getting Scottish tax bands and their structure.
         """
-        bands, personal_allowance = get_tax_bands(scotland=True, year=2025)
+        bands, personal_allowance = _get_tax_bands(scotland=True, year=2025)
 
         assert personal_allowance == 12_570.0
         assert len(bands) == 7
@@ -70,7 +75,7 @@ class TestGetTaxBands:
         import pytest
 
         with pytest.raises(ValueError, match="No tax band data for year 2024"):
-            get_tax_bands(scotland=False, year=2024)
+            _get_tax_bands(scotland=False, year=2024)
 
 
 class TestCalculateIncomeTax:

@@ -32,7 +32,7 @@ def test_get_ni_bands_valid(monkeypatch):
             }
         },
     )
-    bands = ni.get_ni_bands(2025, "category_a")
+    bands = ni._get_ni_bands(2025, "category_a")
     assert isinstance(bands, list)
     assert bands[0].threshold == 10000
     assert bands[1].rate == 0.2
@@ -44,7 +44,7 @@ def test_get_ni_bands_invalid_year(monkeypatch):
     """
     monkeypatch.setattr(ni, "NI_BANDS_DB", {2025: {}})
     with pytest.raises(ValueError):
-        ni.get_ni_bands(2024, "category_a")
+        ni._get_ni_bands(2024, "category_a")
 
 
 def test_get_ni_bands_invalid_category(monkeypatch):
@@ -53,7 +53,7 @@ def test_get_ni_bands_invalid_category(monkeypatch):
     """
     monkeypatch.setattr(ni, "NI_BANDS_DB", {2025: {"category_b": []}})
     with pytest.raises(ValueError):
-        ni.get_ni_bands(2025, "category_a")
+        ni._get_ni_bands(2025, "category_a")
 
 
 def test_calculate_ni_single_band(monkeypatch):

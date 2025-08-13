@@ -10,7 +10,7 @@ from typing import Tuple
 from .databases import TAX_BANDS_DB
 
 
-def get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[list, float]:
+def _get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[list, float]:
     """
     Return income tax bands and personal allowance for the selected region and year.
     Args:
@@ -39,7 +39,7 @@ def calculate_income_tax(income: float, scotland: bool, year: int = 2025) -> flo
     Returns:
         float: Tax payable in pounds.
     """
-    bands, personal_allowance = get_tax_bands(scotland, year)
+    bands, personal_allowance = _get_tax_bands(scotland, year)
     # Remove personal allowance from income
     taxable = max(income - personal_allowance, 0)
     tax_due = 0.0
@@ -76,7 +76,7 @@ def calculate_gross_from_take_home(
     Returns:
         float: Gross income required to achieve the take-home amount.
     """
-    bands, personal_allowance = get_tax_bands(scotland, year)
+    bands, personal_allowance = _get_tax_bands(scotland, year)
 
     # Reduce personal allowance by state pension amount
     effective_personal_allowance = max(personal_allowance - state_pension, 0)
