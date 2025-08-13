@@ -39,8 +39,6 @@ requires-python = ">=3.11"
 [project.optional-dependencies]
 plotting = [
     "altair>=5.0.0",
-    "plotly>=5.0.0",
-    "matplotlib>=3.10.0",
 ]
 app = [
     "streamlit>=1.48.0",
