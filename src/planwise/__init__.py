@@ -8,10 +8,11 @@ Pension (SIPP) and workplace pensions.
 
 import os
 
-from .core import LIMITS_DB, project_investment, project_retirement
-from .ni import NICBand, calculate_ni
+from .core import project_investment, project_retirement
+from .databases import LIMITS_DB, NI_BANDS_DB, STATE_PENSION_DB, TAX_BANDS_DB
+from .ni import calculate_ni
 from .profile import delete_profile, list_profiles, load_profile, save_profile
-from .tax import TAX_BANDS_DB, TaxBand, calculate_income_tax, get_tax_bands
+from .tax import calculate_income_tax, get_tax_bands
 
 try:
     from .plotting import (

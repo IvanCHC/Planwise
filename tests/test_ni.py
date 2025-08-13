@@ -26,8 +26,8 @@ def test_get_ni_bands_valid(monkeypatch):
         {
             2025: {
                 "category_a": [
-                    ni.NICBand(threshold=10000, rate=0.1),
-                    ni.NICBand(threshold=float("inf"), rate=0.2),
+                    ni.NIBand(threshold=10000, rate=0.1),
+                    ni.NIBand(threshold=float("inf"), rate=0.2),
                 ]
             }
         },

@@ -5,49 +5,9 @@ This module loads NI band data and provides functions to compute employee NI con
 for a given year and category.
 """
 
-import json
-import os
-from dataclasses import dataclass
 from typing import Any
 
-
-@dataclass
-class NICBand:
-    """
-    Represents a single National Insurance band.
-    Attributes:
-        threshold (float): Lower threshold of the band.
-        rate (float): NI rate as a decimal.
-    """
-
-    threshold: float
-    rate: float
-
-
-def load_ni_bands_db() -> dict:
-    """
-    Load NI band data from a JSON file and construct a nested dictionary of NI bands by year and category.
-    Returns:
-        dict: NI bands by year and category.
-    """
-    json_path = os.path.join(os.path.dirname(__file__), "data", "ni_bands.json")
-    with open(json_path, "r") as f:
-        raw_db = json.load(f)
-    db: dict = {}
-    for year, categories in raw_db.items():
-        db[int(year)] = {}
-        for category, data in categories.items():
-            bands = []
-            for band in data["bands"]:
-                threshold = band["threshold"]
-                if isinstance(threshold, str) and threshold == "inf":
-                    threshold = float("inf")
-                bands.append(NICBand(threshold=threshold, rate=band["rate"]))
-            db[int(year)][category] = bands
-    return db
-
-
-NI_BANDS_DB = load_ni_bands_db()
+from .databases import NI_BANDS_DB
 
 
 def get_ni_bands(year: int = 2025, category: str = "category_a") -> Any:

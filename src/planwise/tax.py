@@ -5,52 +5,9 @@ This module loads tax band data and provides functions to compute income tax for
 Scottish and rest-of-UK tax bands, including the calculation of tax relief on pension contributions.
 """
 
-import json
-import os
-from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Tuple
 
-
-@dataclass
-class TaxBand:
-    """
-    Represents a single tax band.
-    Attributes:
-        threshold (float): Lower threshold of the band.
-        rate (float): Marginal tax rate in decimal.
-    """
-
-    threshold: float
-    rate: float
-
-
-def load_tax_bands_db() -> dict:
-    """
-    Load tax band data from a JSON file and construct a nested dictionary of tax bands by year and region.
-    Returns:
-        dict: Tax band information by year and region.
-    """
-    json_path = os.path.join(os.path.dirname(__file__), "data", "tax_bands.json")
-    with open(json_path, "r") as f:
-        raw_db = json.load(f)
-    db: dict = {}
-    for year, regions in raw_db.items():
-        db[int(year)] = {}
-        for region, data in regions.items():
-            bands = []
-            for band in data["bands"]:
-                threshold = band["threshold"]
-                if isinstance(threshold, str) and threshold == "inf":
-                    threshold = float("inf")
-                bands.append(TaxBand(threshold=threshold, rate=band["rate"]))
-            db[int(year)][region] = {
-                "personal_allowance": data["personal_allowance"],
-                "bands": bands,
-            }
-    return db
-
-
-TAX_BANDS_DB = load_tax_bands_db()
+from .databases import TAX_BANDS_DB
 
 
 def get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[list, float]:

@@ -7,38 +7,15 @@ profile, contribution rates, and investment returns, as well as helper functions
 calculating contributions and projecting account balances.
 """
 
-import json
-import os
-from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 from planwise.streamlit.sidebar_utils import ProfileSettings
 
+from .databases import LIMITS_DB, STATE_PENSION_DB
 from .tax import calculate_gross_from_take_home, calculate_income_tax
-
-
-def load_state_pension_db() -> Any:
-    json_path = os.path.join(os.path.dirname(__file__), "data", "state_pension.json")
-    with open(json_path, "r") as f:
-        return json.load(f)
-
-
-def load_limits_db() -> Any:
-    """
-    Load annual limits and constants from JSON file.
-    Returns:
-        dict: Limits for each tax year.
-    """
-    json_path = os.path.join(os.path.dirname(__file__), "data", "limits.json")
-    with open(json_path, "r") as f:
-        return json.load(f)
-
-
-STATE_PENSION_DB = load_state_pension_db()
-LIMITS_DB = load_limits_db()
 
 
 class InvestmentSimulator:
