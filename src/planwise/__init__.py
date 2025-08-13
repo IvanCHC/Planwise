@@ -14,7 +14,15 @@ from .profile import delete_profile, list_profiles, load_profile, save_profile
 from .tax import TAX_BANDS_DB, TaxBand, calculate_income_tax, get_tax_bands
 
 try:
-    from .plotting import RetirementPlotter, make_contribution_plot, make_growth_plot
+    from .plotting import (
+        plot_annual_contribution_chart,
+        plot_balances_by_account_chart,
+        plot_growth_projection_chart,
+        plot_pie_chart_breakdown,
+        plot_total_balance_chart,
+        plot_total_withdrawals_chart,
+        plot_withdrawals_by_account_chart,
+    )
 
     _PLOTTING_AVAILABLE = True
 except Exception:
