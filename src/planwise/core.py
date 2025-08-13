@@ -160,7 +160,7 @@ class InvestmentSimulator:
         self._lisa_balance *= (
             1 + self.profile.expected_returns_and_inflation.expected_lisa_annual_return
         )
-        self._isa_balance += record.get("LISA Gross", 0.0)
+        self._isa_balance += record.get("ISA Gross", 0.0)
         self._isa_balance *= (
             1 + self.profile.expected_returns_and_inflation.expected_isa_annual_return
         )
