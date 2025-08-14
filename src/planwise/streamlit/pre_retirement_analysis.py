@@ -2,24 +2,40 @@ import pandas as pd
 import streamlit as st
 
 import planwise as pw
+from planwise.streamlit.sidebar_utils import ProfileSettings
 
 
-def _render_portfilio_statistics(dataframe: pd.DataFrame) -> None:
+def _render_portfilio_statistics(
+    dataframe: pd.DataFrame, total_initial_balance: float
+) -> None:
     final_year = dataframe.iloc[-1]
     portfilio_balance = final_year["Portfolio Balance"]
     net_contribution = final_year["Portfolio Net Contribution"]
+    growth = portfilio_balance - net_contribution - total_initial_balance
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.metric("Total Account Balance", f"£{portfilio_balance:,.0f}")
     with col2:
         st.metric("Total Net Contribution", f"£{net_contribution:,.0f}")
     with col3:
-        st.metric("Total Growth", f"£{portfilio_balance - net_contribution:,.0f}")
+        st.metric("Total Growth", f"£{growth:,.0f}")
     with col4:
         st.metric(
-            "Growth Multiple", f"{portfilio_balance / max(net_contribution, 1):.1f}x"
+            "Total Initial Balance",
+            f"£{total_initial_balance:,.0f}",
         )
+    with col5:
+        multipler = max(
+            (portfilio_balance - total_initial_balance) / net_contribution, 1
+        )
+        if multipler == float("inf"):
+            multipler = "inf"
+        elif multipler == float("nan"):
+            multipler = "NaN"
+        else:
+            multipler = f"{multipler:.2f}x"
+        st.metric("Growth Multiple", f"{multipler}")
 
 
 def _style_dataframe(df: pd.DataFrame) -> pd.DataFrame.style:
@@ -202,8 +218,16 @@ def _render_growth_breakdown(dataframe: pd.DataFrame) -> None:
         )
 
 
-def render_pre_retirement_analysis(dataframe: pd.DataFrame) -> None:
-    _render_portfilio_statistics(dataframe)
+def render_pre_retirement_analysis(
+    profile_settings: "ProfileSettings", dataframe: pd.DataFrame
+) -> None:
+    total_initial_balance = (
+        profile_settings.account_balances.isa_balance
+        + profile_settings.account_balances.lisa_balance
+        + profile_settings.account_balances.sipp_balance
+        + profile_settings.account_balances.workplace_pension_balance
+    )
+    _render_portfilio_statistics(dataframe, total_initial_balance)
     _render_annual_salary_and_contributions(dataframe)
     _render_portfolio_breakdown(dataframe)
     dataframe_styled = _style_dataframe(dataframe)

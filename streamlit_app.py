@@ -75,7 +75,7 @@ def main() -> None:
         ]
     )
     with pre_retirement_tab:
-        render_pre_retirement_analysis(investment_dataframe)
+        render_pre_retirement_analysis(profile_settings, investment_dataframe)
         download_investment_projection(
             investment_dataframe,
             profile_settings.personal_details.current_age,
