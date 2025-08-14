@@ -2,7 +2,7 @@ import pandas as pd
 import streamlit as st
 
 import planwise as pw
-from planwise.streamlit.sidebar_utils import ProfileSettings
+from planwise.profile import ProfileSettings
 
 
 def _render_retirement_summary(dataframe: pd.DataFrame) -> None:

@@ -12,7 +12,7 @@ from typing import Any
 import pandas as pd
 import streamlit as st
 
-from planwise.streamlit.sidebar_utils import ProfileSettings
+from planwise.profile import ProfileSettings
 
 from .databases import LIMITS_DB, STATE_PENSION_DB
 from .tax import calculate_gross_from_take_home, calculate_income_tax

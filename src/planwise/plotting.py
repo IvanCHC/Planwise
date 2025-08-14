@@ -16,7 +16,6 @@ pre‑retirement, the module still provides a number of Plotly functions for
 visualising post‑retirement withdrawals and account balances.
 """
 
-
 import altair as alt
 import pandas as pd
 

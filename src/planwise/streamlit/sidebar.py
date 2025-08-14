@@ -9,8 +9,7 @@ from typing import Any, Tuple
 import streamlit as st
 
 import planwise as pw
-
-from .sidebar_utils import (
+from planwise.profile import (
     AccountBalances,
     ContributionSettings,
     ExpectedReturnsAndInflation,
@@ -20,6 +19,9 @@ from .sidebar_utils import (
     ProfileSettings,
     QualifyingEarnings,
     get_qualifying_earnings_info,
+)
+
+from .sidebar_utils import (
     isa_contribution_rate,
     lisa_contribution_rate,
     sipp_contribution_rate,
