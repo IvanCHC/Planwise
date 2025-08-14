@@ -45,6 +45,72 @@ def delete_profile(name: str) -> None:
         p.unlink()
 
 
+def serialise_profile_settings_to_json(
+    profile_settings: "ProfileSettings", file_path: str
+) -> None:
+    """Serialise a ProfileSettings object into a JSON file.
+
+    Parameters
+    ----------
+    profile_settings : ProfileSettings
+        The ProfileSettings object to serialise.
+    file_path : str
+        The file path where the JSON file will be saved.
+
+    Returns
+    -------
+    None
+    """
+    data = {
+        "tax_year": profile_settings.tax_year,
+        "scotland": profile_settings.scotland,
+        "qualifying_earnings": profile_settings.qualifying_earnings.__dict__,
+        "personal_details": profile_settings.personal_details.__dict__,
+        "contribution_settings": profile_settings.contribution_settings.__dict__,
+        "account_balances": profile_settings.account_balances.__dict__,
+        "post_50_contribution_settings": profile_settings.post_50_contribution_settings.__dict__,
+        "expected_returns_and_inflation": profile_settings.expected_returns_and_inflation.__dict__,
+        "post_retirement_settings": profile_settings.post_retirement_settings.__dict__,
+    }
+    with open(file_path, "w", encoding="utf-8") as json_file:
+        json.dump(data, json_file, indent=2)
+
+
+def deserialise_profile_settings_from_json(file_path: str) -> "ProfileSettings":
+    """Deserialise a JSON file into a ProfileSettings object.
+
+    Parameters
+    ----------
+    file_path : str
+        The file path of the JSON file to deserialise.
+
+    Returns
+    -------
+    ProfileSettings
+        The deserialised ProfileSettings object.
+    """
+    with open(file_path, "r", encoding="utf-8") as json_file:
+        data = json.load(json_file)
+
+    return ProfileSettings(
+        tax_year=data["tax_year"],
+        scotland=data["scotland"],
+        qualifying_earnings=QualifyingEarnings(**data["qualifying_earnings"]),
+        personal_details=PersonalDetails(**data["personal_details"]),
+        contribution_settings=ContributionSettings(**data["contribution_settings"]),
+        account_balances=AccountBalances(**data["account_balances"]),
+        post_50_contribution_settings=Post50ContributionSettings(
+            **data["post_50_contribution_settings"]
+        ),
+        expected_returns_and_inflation=ExpectedReturnsAndInflation(
+            **data["expected_returns_and_inflation"]
+        ),
+        post_retirement_settings=PostRetirementSettings(
+            **data["post_retirement_settings"]
+        ),
+    )
+
+
 def get_qualifying_earnings_info(
     use_qualifying: bool, tax_year: int
 ) -> "QualifyingEarnings":
