@@ -110,24 +110,7 @@ def _tax_settings_section() -> Tuple[bool, bool]:
     )
 
 
-def _personal_details_section(
-    tax_year: int,
-    scotland: bool,
-) -> "PersonalDetails":
-    """Collect personal details such as age and salary from the user, and calculate
-    estimated take-home salary, National Insurance contributions, and income tax.
-
-    Parameters
-    ----------
-    scotland : bool
-        Whether the user is a Scottish taxpayer (affects income tax bands).
-
-    Returns
-    -------
-    PersonalDetails
-        A dataclass instance containing the user's personal details and calculated
-        financial figures.
-    """
+def _personal_details_section() -> "PersonalDetails":
     with st.sidebar.expander("Personal Details", expanded=False):
         current_age: int = st.number_input(
             "Current age",
@@ -724,7 +707,7 @@ def sidebar_inputs() -> "ProfileSettings":
     tax_year = _tax_year_selectbox()
     scotland, use_qualifying = _tax_settings_section()
     qualifying_earnings = get_qualifying_earnings_info(use_qualifying, tax_year)
-    personal_details = _personal_details_section(tax_year, scotland)
+    personal_details = _personal_details_section()
     contribution_settings = _contribution_rates_section(
         tax_year, personal_details, qualifying_earnings
     )

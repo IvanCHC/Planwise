@@ -43,3 +43,37 @@ def get_default_state() -> dict[str, int | float | bool]:
 
 def reset_default_state() -> None:
     st.session_state.update(get_default_state())
+
+
+from planwise.profile import (
+    ProfileSettings,
+    get_personal_details,
+    get_qualifying_earnings_info,
+)
+
+
+def convert_streamlit_state_to_profile() -> None:
+    tax_year = st.session_state.get("tax_year", 2025)
+    scotland = st.session_state.get("scotland", False)
+    use_qualifying = st.session_state.get("use_qualifying", False)
+    qualifying_earnings = get_qualifying_earnings_info(use_qualifying, tax_year)
+
+    current_age = st.session_state.get("current_age", 25)
+    retirement_age = st.session_state.get("retirement_age", 67)
+    salary = st.session_state.get("salary", 30000.0)
+    personal_details = get_personal_details(
+        current_age, retirement_age, salary, tax_year, scotland
+    )
+
+
+def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> None:
+    state_data: dict[str, bool | int | float] = {}
+    state_data["tax_year"] = profile_settings.tax_year
+    state_data["scotland"] = profile_settings.scotland
+    state_data[
+        "use_qualifying"
+    ] = profile_settings.qualifying_earnings.use_qualifying_earnings
+
+    state_data["current_age"] = profile_settings.personal_details.current_age
+    state_data["retirement_age"] = profile_settings.personal_details.retirement_age
+    state_data["salary"] = profile_settings.personal_details.salary
