@@ -5,7 +5,7 @@ Welcome to the Planwise documentation! This library helps you model retirement s
 :::info
 **Python Version Compatibility**
 
-Planwise is tested on Python 3.11 and later.  Earlier Python versions (e.g., 3.8–3.10) are
+Planwise is tested on Python 3.11 and later.  Earlier Python versions (e.g., 3.8-3.10) are
 not officially supported, although individual modules may still work.  Make sure your
 environment is using Python 3.11+ before installing the package.
 :::
@@ -79,7 +79,7 @@ the :class:`planwise.core.RetirementSimulator` class.  This class stores
 the input parameters and internal state and exposes a :meth:`simulate`
 method that returns a ``DataFrame`` identical to the result from
 ``project_retirement``.  Using the class directly makes it easier to
-understand and modify intermediate steps, since the year–by–year logic is
+understand and modify intermediate steps, since the year-by-year logic is
 organized into small helper methods rather than a single monolithic
 function.
 
@@ -273,9 +273,9 @@ will receive an informative error message.
 
 Visualization of projection data is provided by the :class:`planwise.plotting.RetirementPlotter` class.  The class accepts a DataFrame from :func:`planwise.core.project_retirement` and exposes methods to build Altair charts for contributions, pot growth and a combined view:
 
-* ``RetirementPlotter.contribution_chart(title=None)`` – return a stacked bar chart showing the share of net contributions by account.  Pass a custom ``title`` to override the default.
-* ``RetirementPlotter.growth_chart(title=None)`` – return a line chart showing both pot values and accumulated contributions for each account.  Pots are drawn with solid lines while accumulated contributions are drawn with dashed lines.  If the DataFrame lacks pre‑computed accumulated columns, cumulative sums of the annual net contributions are computed on the fly.
-* ``RetirementPlotter.combined_chart(contrib_title=None, growth_title=None)`` – horizontally concatenate the contributions and growth charts into a single figure.
+* ``RetirementPlotter.contribution_chart(title=None)`` - return a stacked bar chart showing the share of net contributions by account.  Pass a custom ``title`` to override the default.
+* ``RetirementPlotter.growth_chart(title=None)`` - return a line chart showing both pot values and accumulated contributions for each account.  Pots are drawn with solid lines while accumulated contributions are drawn with dashed lines.  If the DataFrame lacks pre‑computed accumulated columns, cumulative sums of the annual net contributions are computed on the fly.
+* ``RetirementPlotter.combined_chart(contrib_title=None, growth_title=None)`` - horizontally concatenate the contributions and growth charts into a single figure.
 
 For convenience and backward compatibility, the module still exports the functions ``make_contribution_plot(df, title=None)``, ``make_growth_plot(df, title=None)`` and ``make_combined_plot(df)`` which simply instantiate a :class:`RetirementPlotter` internally and delegate to the corresponding methods.
 

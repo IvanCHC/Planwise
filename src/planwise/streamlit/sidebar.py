@@ -18,6 +18,7 @@ from planwise.profile import (
     PostRetirementSettings,
     ProfileSettings,
     QualifyingEarnings,
+    get_personal_details,
     get_qualifying_earnings_info,
 )
 
@@ -100,7 +101,7 @@ def _tax_settings_section() -> Tuple[bool, bool]:
         use_qualifying: bool = st.checkbox(
             "Use qualifying earnings for workplace contributions?",
             value=False,
-            help="If checked, contributions use qualifying earnings (£6,240–£50,270); otherwise, total salary.",
+            help="If checked, contributions use qualifying earnings (£6,240-£50,270); otherwise, total salary.",
             key="use_qualifying",
         )
     return (
@@ -153,26 +154,20 @@ def _personal_details_section(
             key="salary",
         )
 
-        # Assume category A for NI
-        ni_contribution = pw.calculate_ni(salary, year=tax_year, category="category_a")
-
-        income_tax = pw.calculate_income_tax(salary, year=tax_year, scotland=scotland)
-        take_home_salary = salary - ni_contribution - income_tax
+        personal_details = get_personal_details(
+            current_age=current_age,
+            retirement_age=retirement_age,
+            salary=salary,
+            tax_year=st.session_state.get("tax_year", 2025),
+            scotland=st.session_state.get("scotland", False),
+        )
+        take_home_salary = personal_details.take_home_salary
         take_home_pct = take_home_salary / salary if salary > 0 else 0
         st.write(f"**Estimated take-home salary:** £{take_home_salary:,.0f}")
         st.progress(
             min(take_home_pct, 1.0),
             text=f"Take-home salary: {take_home_pct:.1%} of gross salary",
         )
-
-    personal_details = PersonalDetails(
-        current_age=current_age,
-        retirement_age=retirement_age,
-        salary=salary,
-        take_home_salary=take_home_salary,
-        ni_contribution=ni_contribution,
-        income_tax=income_tax,
-    )
     return personal_details
 
 

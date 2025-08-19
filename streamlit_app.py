@@ -11,7 +11,7 @@ application has been refactored into smaller helper functions, each
 responsible for a logical section of the user interface. Detailed comments
 explain the purpose of each section and important calculations.
 
-The high–level flow is:
+The high-level flow is:
 
 1. The sidebar collects user inputs: personal details, tax settings,
    contribution rates, post‑50 LISA redirection, and expected returns.

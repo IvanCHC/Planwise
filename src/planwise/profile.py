@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .databases import LIMITS_DB
+from .ni import calculate_ni
+from .tax import calculate_income_tax
 
 PROFILES_DIR = Path(".profiles")
 PROFILES_DIR.mkdir(exist_ok=True)
@@ -72,7 +74,7 @@ def serialise_profile_settings_to_json(
         "expected_returns_and_inflation": profile_settings.expected_returns_and_inflation.__dict__,
         "post_retirement_settings": profile_settings.post_retirement_settings.__dict__,
     }
-    with open(file_path, "w", encoding="utf-8") as json_file:
+    with open(file_path, "w") as json_file:
         json.dump(data, json_file, indent=2)
 
 
@@ -89,7 +91,7 @@ def deserialise_profile_settings_from_json(file_path: str) -> "ProfileSettings":
     ProfileSettings
         The deserialised ProfileSettings object.
     """
-    with open(file_path, "r", encoding="utf-8") as json_file:
+    with open(file_path, "r") as json_file:
         data = json.load(json_file)
 
     return ProfileSettings(
@@ -157,6 +159,22 @@ class QualifyingEarnings:
     qualifying_earnings: float
     qualifying_upper: float
     qualifying_lower: float
+
+
+def get_personal_details(
+    current_age: int, retirement_age: int, salary: float, tax_year: int, scotland: bool
+) -> "PersonalDetails":
+    ni_contribution = calculate_ni(salary, year=tax_year, category="category_a")
+    income_tax = calculate_income_tax(salary, year=tax_year, scotland=scotland)
+    take_home_salary = salary - ni_contribution - income_tax
+    return PersonalDetails(
+        current_age=current_age,
+        retirement_age=retirement_age,
+        salary=salary,
+        take_home_salary=take_home_salary,
+        ni_contribution=ni_contribution,
+        income_tax=income_tax,
+    )
 
 
 @dataclass
