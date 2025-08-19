@@ -46,9 +46,14 @@ def reset_default_state() -> None:
 
 
 from planwise.profile import (
+    AccountBalances,
+    ContributionSettings,
     ProfileSettings,
+    get_isa_contribution_rate,
     get_personal_details,
     get_qualifying_earnings_info,
+    get_sipp_contribution_rate,
+    get_workplace_contribution_rate,
 )
 
 
@@ -65,6 +70,79 @@ def convert_streamlit_state_to_profile() -> None:
         current_age, retirement_age, salary, tax_year, scotland
     )
 
+    use_exact_amount = st.session_state.get("use_exact_amount", False)
+    workplace_employer_contribution = st.session_state.get(
+        "workplace_employer_contribution", 0.03
+    )
+    workplace_employee_contribution = st.session_state.get(
+        "workplace_employee_contribution", 0.05
+    )
+    workplace_er_rate, workplace_er_contribution = get_workplace_contribution_rate(
+        workplace_employer_contribution,
+        personal_details,
+        qualifying_earnings,
+        use_exact_amount,
+    )
+    workplace_ee_rate, workplace_ee_contribution = get_workplace_contribution_rate(
+        workplace_employee_contribution,
+        personal_details,
+        qualifying_earnings,
+        use_exact_amount,
+    )
+    lisa_contribution = st.session_state.get("lisa_contribution", 0.0)
+    isa_contribution = st.session_state.get("isa_contribution", 0.0)
+    sipp_contribution = st.session_state.get("sipp_contribution", 0.0)
+    lisa_rate, lisa_contribution = get_isa_contribution_rate(
+        lisa_contribution, personal_details, use_exact_amount
+    )
+    isa_rate, isa_contribution = get_isa_contribution_rate(
+        isa_contribution, personal_details, use_exact_amount
+    )
+    sipp_rate, sipp_contribution = get_sipp_contribution_rate(
+        sipp_contribution, personal_details, use_exact_amount
+    )
+
+    total_net_contribution = (
+        workplace_ee_contribution
+        + lisa_contribution
+        + isa_contribution
+        + sipp_contribution
+    )
+    total_sipp_contribution = sipp_contribution * 1.25
+    total_workplace_contribution = (
+        workplace_er_contribution + workplace_ee_contribution * 1.25
+    )
+    total_pension_contribution = total_workplace_contribution + total_sipp_contribution
+    total_isa_contribution = lisa_contribution * 1.25 + isa_contribution
+    contribution_settings = ContributionSettings(
+        workplace_er_rate=workplace_er_rate,
+        workplace_er_contribution=workplace_er_contribution,
+        workplace_ee_rate=workplace_ee_rate,
+        workplace_ee_contribution=workplace_ee_contribution,
+        lisa_rate=lisa_rate,
+        lisa_contribution=lisa_contribution,
+        isa_rate=isa_rate,
+        isa_contribution=isa_contribution,
+        sipp_rate=sipp_rate,
+        sipp_contribution=sipp_contribution,
+        total_net_contribution=total_net_contribution,
+        total_workplace_contribution=total_workplace_contribution,
+        total_sipp_contribution=total_sipp_contribution,
+        total_isa_contribution=total_isa_contribution,
+        total_pension_contribution=total_pension_contribution,
+    )
+
+    lisa_balance = st.session_state.get("lisa_balance", 0.0)
+    isa_balance = st.session_state.get("isa_balance", 0.0)
+    sipp_balance = st.session_state.get("sipp_balance", 0.0)
+    workplace_balance = st.session_state.get("workplace_balance", 0.0)
+    account_balances = AccountBalances(
+        lisa_balance=lisa_balance,
+        isa_balance=isa_balance,
+        sipp_balance=sipp_balance,
+        workplace_pension_balance=workplace_balance,
+    )
+
 
 def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> None:
     state_data: dict[str, bool | int | float] = {}
@@ -77,3 +155,27 @@ def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> N
     state_data["current_age"] = profile_settings.personal_details.current_age
     state_data["retirement_age"] = profile_settings.personal_details.retirement_age
     state_data["salary"] = profile_settings.personal_details.salary
+
+    state_data["use_exact_amounts"] = False
+    state_data[
+        "workplace_employer_contribution"
+    ] = profile_settings.contribution_settings.workplace_er_contribution
+    state_data[
+        "workplace_employee_contribution"
+    ] = profile_settings.contribution_settings.workplace_ee_contribution
+    state_data[
+        "lisa_contribution"
+    ] = profile_settings.contribution_settings.lisa_contribution
+    state_data[
+        "isa_contribution"
+    ] = profile_settings.contribution_settings.isa_contribution
+    state_data[
+        "sipp_contribution"
+    ] = profile_settings.contribution_settings.sipp_contribution
+
+    state_data["lisa_balance"] = profile_settings.account_balances.lisa_balance
+    state_data["isa_balance"] = profile_settings.account_balances.isa_balance
+    state_data["sipp_balance"] = profile_settings.account_balances.sipp_balance
+    state_data[
+        "workplace_balance"
+    ] = profile_settings.account_balances.workplace_pension_balance

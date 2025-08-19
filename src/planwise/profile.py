@@ -205,6 +205,72 @@ class PersonalDetails:
     income_tax: float
 
 
+def get_workplace_contribution_rate(
+    workplace_contribution: float,
+    personal_details: "PersonalDetails",
+    qualifying_earnings: "QualifyingEarnings",
+    use_exact_amount: bool = False,
+) -> tuple[float, float]:
+    if not use_exact_amount:
+        if qualifying_earnings.use_qualifying_earnings:
+            potential_contribution_amount = (
+                personal_details.salary - qualifying_earnings.qualifying_lower
+                if personal_details.salary < qualifying_earnings.qualifying_upper
+                else qualifying_earnings.qualifying_earnings
+            )
+            contribution = potential_contribution_amount * workplace_contribution
+        else:
+            contribution = personal_details.salary * workplace_contribution
+        rate = workplace_contribution
+    else:
+        rate = (
+            workplace_contribution / personal_details.salary
+            if personal_details.salary > 0
+            else 0.0
+        )
+        contribution = workplace_contribution
+
+    return rate, contribution
+
+
+def get_isa_contribution_rate(
+    isa_contribution: float,
+    personal_details: "PersonalDetails",
+    use_exact_amount: bool = False,
+) -> tuple[float, float]:
+    if not use_exact_amount:
+        contribution = isa_contribution * personal_details.take_home_salary
+        rate = isa_contribution
+    else:
+        rate = (
+            isa_contribution / personal_details.take_home_salary
+            if personal_details.take_home_salary > 0
+            else 0.0
+        )
+        contribution = isa_contribution
+
+    return rate, contribution
+
+
+def get_sipp_contribution_rate(
+    sipp_contribution: float,
+    personal_details: "PersonalDetails",
+    use_exact_amount: bool = False,
+) -> tuple[float, float]:
+    if not use_exact_amount:
+        contribution = sipp_contribution * personal_details.take_home_salary
+        rate = sipp_contribution
+    else:
+        rate = (
+            sipp_contribution / personal_details.take_home_salary
+            if personal_details.take_home_salary > 0
+            else 0.0
+        )
+        contribution = sipp_contribution
+
+    return rate, contribution
+
+
 @dataclass
 class ContributionSettings:
     """Data class to hold contribution settings.

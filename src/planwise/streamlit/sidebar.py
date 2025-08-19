@@ -18,18 +18,14 @@ from planwise.profile import (
     PostRetirementSettings,
     ProfileSettings,
     QualifyingEarnings,
+    get_isa_contribution_rate,
     get_personal_details,
     get_qualifying_earnings_info,
+    get_sipp_contribution_rate,
+    get_workplace_contribution_rate,
 )
 
 from .profiles_manager import render_profiles_manager
-from .sidebar_utils import (
-    isa_contribution_rate,
-    lisa_contribution_rate,
-    sipp_contribution_rate,
-    workplace_ee_contribution_rate,
-    workplace_er_contribution_rate,
-)
 
 
 def _logo_section() -> None:
@@ -159,29 +155,6 @@ def _contribution_rates_section(
     personal_details: "PersonalDetails",
     qualifying_earnings: "QualifyingEarnings",
 ) -> "ContributionSettings":
-    """Collect contribution rates for each tax wrapper based on user inputs.
-
-    This function handles the complex logic of enforcing annual allowances and
-    computing maximum contribution rates for Lifetime ISA (LISA), Stocks & Shares
-    ISA, Self-Invested Personal Pension (SIPP) and workplace pension (employee
-    and employer). It returns the chosen rates along with information needed
-    for downstream calculations (e.g. unused salary and allowance).
-
-    Parameters
-    ----------
-    tax_year : int
-        The start year of the tax year for looking up contribution limits.
-    personal_details : PersonalDetails
-        A dataclass instance containing the user's personal details and calculated
-        financial figures.
-    qualifying_earnings : QualifyingEarnings
-        A dataclass instance containing qualifying earnings information.
-
-    Returns
-    -------
-    ContributionSettings
-        A dataclass instance containing the contribution rates and other settings.
-    """
     with st.sidebar.expander("Contribution Settings", expanded=False):
         with st.container(horizontal_alignment="right"):
             use_exact_amount = st.toggle(
@@ -189,6 +162,7 @@ def _contribution_rates_section(
             )
 
         total_net_contribution = 0.0
+        pension_allowance = pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
 
         with st.expander("Step 1. Workplace Contributions", expanded=False):
             if (
@@ -202,24 +176,127 @@ def _contribution_rates_section(
                 workplace_er_rate, workplace_er_contribution = 0.0, 0.0
                 workplace_ee_rate, workplace_ee_contribution = 0.0, 0.0
             else:
+                if not use_exact_amount:
+                    workplace_employer_contribution = st.slider(
+                        "Workplace Pension (Employer) %",
+                        0.0,
+                        1.0,
+                        0.03,
+                        step=0.001,
+                        key="workplace_employer_contribution",
+                        help="Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
+                    )
+                else:
+                    if qualifying_earnings.use_qualifying_earnings:
+                        potential_contribution_amount = (
+                            personal_details.salary
+                            - qualifying_earnings.qualifying_lower
+                            if personal_details.salary
+                            < qualifying_earnings.qualifying_upper
+                            else qualifying_earnings.qualifying_earnings
+                        )
+                        workplace_employer_contribution = st.number_input(
+                            "Workplace Pension (Employer) (£)",
+                            min_value=0.0,
+                            max_value=min(
+                                potential_contribution_amount, pension_allowance
+                            ),
+                            value=0.0,
+                            step=100.0,
+                            key="workplace_employer_contribution",
+                            help=f"Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
+                        )
+                    else:
+                        workplace_employer_contribution = st.number_input(
+                            "Workplace Pension (Employer) (£)",
+                            min_value=0.0,
+                            max_value=min(personal_details.salary, pension_allowance),
+                            value=0.0,
+                            step=100.0,
+                            key="workplace_employer_contribution",
+                            help=f"Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
+                        )
                 (
                     workplace_er_rate,
                     workplace_er_contribution,
-                ) = workplace_er_contribution_rate(
-                    tax_year,
+                ) = get_workplace_contribution_rate(
+                    workplace_employer_contribution,
                     personal_details,
                     qualifying_earnings,
                     use_exact_amount,
                 )
+                st.write(
+                    f"**Workplace (ER) Pension:** £{workplace_er_contribution:,.0f} ({workplace_er_rate*100:,.4}%)"
+                )
+
+                unused_allowance = pension_allowance - workplace_er_contribution
+                tax_relief_rate = 1.25  # 25% tax relief on pension contributions
+                if not use_exact_amount:
+                    if qualifying_earnings.use_qualifying_earnings:
+                        max_workspace_ee_rate = min(
+                            (
+                                personal_details.salary
+                                - qualifying_earnings.qualifying_lower
+                            )
+                            / qualifying_earnings.qualifying_earnings,
+                            (
+                                personal_details.salary
+                                - qualifying_earnings.qualifying_lower
+                            )
+                            / personal_details.take_home_salary,  # Cannot exceed take-home salary
+                            1,  # full qualifying_earnings.qualifying_earnings
+                            unused_allowance / (pension_allowance * tax_relief_rate),
+                        )
+                    else:
+                        max_workspace_ee_rate = min(
+                            personal_details.take_home_salary
+                            / personal_details.salary,  # Cannot exceed take-home salary
+                            1,  # full salary
+                            unused_allowance
+                            / (personal_details.salary * tax_relief_rate),
+                        )
+                    workplace_employee_contribution = st.slider(
+                        "Net Workplace Pension (Employee) %",
+                        0.0,
+                        max_workspace_ee_rate,
+                        0.05,
+                        step=0.001,
+                        key="workplace_employee_contribution",
+                        help="Employee contributions to workplace pension, exluding tax relief.",
+                    )
+                else:
+                    if qualifying_earnings.use_qualifying_earnings:
+                        max_workspace_ee_contribution = min(
+                            personal_details.take_home_salary
+                            - qualifying_earnings.qualifying_lower,
+                            qualifying_earnings.qualifying_earnings,
+                            unused_allowance / tax_relief_rate,
+                        )
+                    else:
+                        max_workspace_ee_contribution = min(
+                            personal_details.take_home_salary,
+                            unused_allowance / tax_relief_rate,
+                        )
+                    workplace_employee_contribution = st.number_input(
+                        "Net Workplace Pension (Employee) (£)",
+                        min_value=0.0,
+                        max_value=max_workspace_ee_contribution,
+                        value=0.0,
+                        step=100.0,
+                        key="workplace_employee_contribution",
+                        help="Employee contributions to workplace pension, excluding tax relief.",
+                    )
                 (
                     workplace_ee_rate,
                     workplace_ee_contribution,
-                ) = workplace_ee_contribution_rate(
-                    tax_year,
+                ) = get_workplace_contribution_rate(
+                    workplace_employee_contribution,
                     personal_details,
-                    workplace_er_contribution,
                     qualifying_earnings,
                     use_exact_amount,
+                )
+                st.write(
+                    f"**Workplace (EE) Pension:** £{workplace_ee_contribution:,.0f} ({workplace_ee_rate*100:,.4}%)"
                 )
                 total_workplace_contribution = (
                     workplace_er_contribution + workplace_ee_contribution * 1.25
@@ -249,19 +326,81 @@ def _contribution_rates_section(
                 lisa_rate, lisa_contribution = 0.0, 0.0
                 isa_rate, isa_contribution = 0.0, 0.0
             else:
-                lisa_rate, lisa_contribution = lisa_contribution_rate(
-                    tax_year,
-                    personal_details.take_home_salary,
-                    total_net_contribution,
-                    use_exact_amount,
+                lisa_limit = pw.LIMITS_DB[str(tax_year)]["lisa_limit"]
+                unused_salary = (
+                    personal_details.take_home_salary - total_net_contribution
                 )
-                isa_rate, isa_contribution = isa_contribution_rate(
-                    tax_year,
-                    personal_details.take_home_salary,
-                    lisa_contribution,
-                    total_net_contribution,
-                    use_exact_amount,
+                if not use_exact_amount:
+                    max_lisa_rate = min(
+                        lisa_limit / personal_details.take_home_salary,
+                        1.0,
+                        unused_salary / personal_details.take_home_salary,
+                    )
+                    lisa_contribution = st.slider(
+                        "LISA contribution %",
+                        0.0,
+                        max_lisa_rate,
+                        0.0,
+                        step=0.001,
+                        key="lisa_contribution",
+                        help=f"LISA contribution limit is £{lisa_limit:,.0f}.",
+                    )
+                else:
+                    lisa_contribution = st.number_input(
+                        "LISA contribution (£)",
+                        min_value=0.0,
+                        max_value=min(lisa_limit, unused_salary),
+                        value=0.0,
+                        step=100.0,
+                        key="lisa_contribution",
+                        help=f"LISA contribution limit is £{lisa_limit:,.0f}.",
+                    )
+                lisa_rate, lisa_contribution = get_isa_contribution_rate(
+                    lisa_contribution, personal_details, use_exact_amount
                 )
+                st.write(
+                    f"**LISA contribution:** £{lisa_contribution:,.0f} ({lisa_rate*100:,.3}%)"
+                )
+
+                isa_limit = pw.LIMITS_DB[str(tax_year)]["isa_limit"]
+                remaining_isa_allowance = max(isa_limit - lisa_contribution, 0.0)
+                unused_salary = (
+                    personal_details.take_home_salary
+                    - total_net_contribution
+                    - lisa_contribution
+                )
+                if not use_exact_amount:
+                    max_isa_rate = min(
+                        remaining_isa_allowance / personal_details.take_home_salary,
+                        1.0,
+                        unused_salary / personal_details.take_home_salary,
+                    )
+                    isa_contribution = st.slider(
+                        "ISA contribution %",
+                        0.0,
+                        max_isa_rate,
+                        0.0,
+                        step=0.001,
+                        key="isa_contribution",
+                        help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions.",
+                    )
+                else:
+                    isa_contribution = st.number_input(
+                        "ISA contribution (£)",
+                        min_value=0.0,
+                        max_value=min(remaining_isa_allowance, unused_salary),
+                        value=0.0,
+                        step=100.0,
+                        key="isa_contribution",
+                        help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions.",
+                    )
+                isa_rate, isa_contribution = get_isa_contribution_rate(
+                    isa_contribution, personal_details, use_exact_amount
+                )
+                st.write(
+                    f"**ISA contribution:** £{isa_contribution:,.0f} ({isa_rate*100:,.3}%)"
+                )
+
                 total_isa_contribution = lisa_contribution + isa_contribution
                 total_net_contribution += total_isa_contribution
                 allowance_usage = (
@@ -284,13 +423,51 @@ def _contribution_rates_section(
                 )
                 sipp_rate, sipp_contribution = 0.0, 0.0
             else:
-                sipp_rate, sipp_contribution = sipp_contribution_rate(
-                    tax_year,
-                    personal_details,
-                    total_workplace_contribution,
-                    total_net_contribution,
-                    use_exact_amount,
+                pension_allowance = pw.LIMITS_DB[str(tax_year)][
+                    "pension_annual_allowance"
+                ]
+                unused_allowance = pension_allowance - total_workplace_contribution
+                unused_salary = (
+                    personal_details.take_home_salary - total_net_contribution
                 )
+                tax_relief_rate = 1.25  # 25% tax relief on pension contributions
+                if not use_exact_amount:
+                    max_sipp_rate = min(
+                        unused_salary / personal_details.take_home_salary,
+                        unused_allowance / (pension_allowance * tax_relief_rate),
+                        1.0,
+                    )
+                    sipp_contribution = st.slider(
+                        "SIPP contribution %",
+                        0.0,
+                        max_sipp_rate,
+                        0.0,
+                        step=0.001,
+                        key="sipp_contribution",
+                        help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions.",
+                    )
+                else:
+                    max_sipp_contribution = min(
+                        unused_salary,
+                        unused_allowance / tax_relief_rate,
+                        pension_allowance,
+                    )
+                    sipp_contribution = st.number_input(
+                        "SIPP contribution (£)",
+                        min_value=0.0,
+                        max_value=max_sipp_contribution,
+                        value=0.0,
+                        step=100.0,
+                        key="sipp_contribution",
+                        help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions.",
+                    )
+                sipp_rate, sipp_contribution = get_sipp_contribution_rate(
+                    sipp_contribution, personal_details, use_exact_amount
+                )
+                st.write(
+                    f"**SIPP contribution:** £{sipp_contribution:,.0f} ({sipp_rate*100:,.3}%)"
+                )
+
                 total_sipp_contribution = (
                     sipp_contribution * 1.25
                 )  # 25% tax relief on employee contributions
