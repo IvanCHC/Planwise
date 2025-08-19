@@ -49,7 +49,7 @@ def lisa_contribution_rate(
             max_lisa_rate,
             0.0,
             step=0.001,
-            key="lisa_rate",
+            key="lisa_contribution",
             help=f"LISA contribution limit is £{lisa_limit:,.0f}.",
         )
         lisa_contribution = take_home_salary * lisa_rate
@@ -114,7 +114,7 @@ def isa_contribution_rate(
             max_isa_rate,
             0.0,
             step=0.001,
-            key="isa_rate",
+            key="isa_contribution",
             help=f"ISA contribution limit is £{isa_limit:,.0f} including LISA contributions.",
         )
         isa_contribution = take_home_salary * isa_rate
@@ -167,7 +167,7 @@ def workplace_er_contribution_rate(
             1.0,
             0.03,
             step=0.001,
-            key="workplace_employer_rate",
+            key="workplace_employer_contribution",
             help="Employer contributions to workplace pension. Max allowed by annual allowance (£{pension_allowance:,.0f}).",
         )
         if qualifying_earnings.use_qualifying_earnings:
@@ -276,7 +276,7 @@ def workplace_ee_contribution_rate(
             max_workspace_ee_rate,
             0.05,
             step=0.001,
-            key="workplace_employee_rate",
+            key="workplace_employee_contribution",
             help="Employee contributions to workplace pension, exluding tax relief.",
         )
         if qualifying_earnings.use_qualifying_earnings:
@@ -359,7 +359,7 @@ def sipp_contribution_rate(
             max_sipp_rate,
             0.0,
             step=0.001,
-            key="sipp_rate",
+            key="sipp_contribution",
             help=f"SIPP contribution limit is £{pension_allowance:,.0f} including workplace contributions.",
         )
         sipp_contribution = personal_details.take_home_salary * sipp_rate

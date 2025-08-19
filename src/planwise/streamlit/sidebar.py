@@ -21,6 +21,7 @@ from planwise.profile import (
     get_qualifying_earnings_info,
 )
 
+from .profiles_manager import render_profiles_manager
 from .sidebar_utils import (
     isa_contribution_rate,
     lisa_contribution_rate,
@@ -73,6 +74,7 @@ def _tax_year_selectbox() -> Any:
         options=available_years,
         index=available_years.index(default_year),
         format_func=lambda y: f"{y}/{str(y+1)[-2:]}",
+        key="tax_year",
     )
 
 
@@ -146,7 +148,7 @@ def _personal_details_section(
             "Annual salary (£)",
             min_value=1_000.0,
             max_value=1_000_000.0,
-            value=40_000.0,
+            value=30_000.0,
             step=1_000.0,
             key="salary",
         )
@@ -447,7 +449,7 @@ def _post50_lisa_section(
                     1.0,
                     1.0,
                     step=0.05,
-                    key="shift_lisa_to_isa",
+                    key="redirectable_to_isa",
                 )
                 shift_lisa_to_sipp = 1.0 - shift_lisa_to_isa
                 redirectable_to_isa = shift_lisa_to_isa * lisa_contribution
@@ -638,7 +640,7 @@ def _post_retirement_section(
                 ),
                 step=1,
                 help="Age at which you can start withdrawing from pension.",
-                key="postret_pension_withdrawal_age",
+                key="postret_taxfree_pension_withdrawal_age",
             )
             taxfree_pension_withdrawal_percentage = st.slider(
                 "Taxfree Pension withdrawal percentage (%)",
@@ -647,7 +649,7 @@ def _post_retirement_section(
                 0.0,
                 step=0.01,
                 help="How much you want to withdraw from Pension per year as a percentage of the annual withdrawal amount.",
-                key="postret_pension_targeted_withdrawal_percentage",
+                key="postret_taxfree_pension_targeted_withdrawal_percentage",
             )
 
             taxable_pension_withdrawal_age_minimum = pw.LIMITS_DB[str(tax_year)][
@@ -739,6 +741,9 @@ def sidebar_inputs() -> "ProfileSettings":
     post_retirement_settings = _post_retirement_section(
         tax_year, personal_details, expected_returns_and_inflation
     )
+
+    st.sidebar.divider()
+    render_profiles_manager()
 
     profile_settings = ProfileSettings(
         tax_year=tax_year,

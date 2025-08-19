@@ -31,12 +31,16 @@ def list_profiles() -> list[str]:
 
 
 def save_profile(name: str, data: dict) -> None:
-    profile_path(name).write_text(json.dumps(data, indent=2), encoding="utf-8")
+    file_path = profile_path(name)
+    # profile_settings = ProfileSettings(**data)
+    # serialise_profile_settings_to_json(profile_settings, file_path)
+    file_path.write_text(json.dumps(data, indent=2))
 
 
 def load_profile(name: str) -> dict | None:
     p = profile_path(name)
-    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    # return deserialise_profile_settings_from_json(p) if p.exists() else None
+    return json.loads(p.read_text()) if p.exists() else None
 
 
 def delete_profile(name: str) -> None:
@@ -56,10 +60,6 @@ def serialise_profile_settings_to_json(
         The ProfileSettings object to serialise.
     file_path : str
         The file path where the JSON file will be saved.
-
-    Returns
-    -------
-    None
     """
     data = {
         "tax_year": profile_settings.tax_year,

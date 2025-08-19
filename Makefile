@@ -31,6 +31,7 @@ clean:  ## Clean up build artifacts
 	rm -rf .pytest_cache/
 	rm -rf .coverage
 	rm -rf htmlcov/
+	rm -rf .profiles/
 	find . -type d -name __pycache__ -delete
 	find . -type f -name "*.pyc" -delete
 
