@@ -552,7 +552,7 @@ def _post_retirement_section(
         withdrawal_today_amount = st.number_input(
             "Annual withdrawal in today's money (£)",
             min_value=0.0,
-            value=30000.0,
+            value=0.0,
             step=1000.0,
             help="How much you want to withdraw per year in today's money.",
             key="postret_withdrawal_today",

@@ -300,19 +300,20 @@ class RetirementSimulator:
         ]
 
     def simulate(self) -> pd.DataFrame:
-        percentage = (
-            self.profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage
-            + self.profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage
-            + self.profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage
-            + self.profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage
-        )
-        if percentage != 1.0:
-            st.warning(
-                f"Targeted withdrawal percentages do not sum to 100%. "
-                f"Current sum is {percentage * 100:.2f}%. "
-                f"Expected to be 100%."
+        if self._annual_withdrawal > 0:
+            percentage = (
+                self.profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage
+                + self.profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage
+                + self.profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage
+                + self.profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage
             )
-            return pd.DataFrame()
+            if percentage != 1.0:
+                st.warning(
+                    f"Targeted withdrawal percentages do not sum to 100%. "
+                    f"Current sum is {percentage * 100:.2f}%. "
+                    f"Expected to be 100%."
+                )
+                return pd.DataFrame()
 
         simluation_years = self._simulation_end_age - self._retirement_age
         records: list[dict[str, Any]] = []
@@ -403,7 +404,7 @@ class RetirementSimulator:
             + withdrawal_taxable_pension
             + state_pension
         )
-        total_withdrawal_tax = total_withdrawal + state_pension
+        total_withdrawal_tax = total_withdrawal + income_tax
 
         account_flags = [False] * len(self._accounts)
         if self._lisa_balance_todays >= withdrawal_lisa:
