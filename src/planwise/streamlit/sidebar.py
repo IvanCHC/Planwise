@@ -637,6 +637,7 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             step=0.001,
             key="roi_lisa",
         )
+        st.write(f"**LISA annual return:** {expected_lisa_annual_return * 100:.2f}%")
         expected_isa_annual_return = st.slider(
             "ISA expected annual return (%)",
             0.0,
@@ -645,6 +646,7 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             step=0.001,
             key="roi_isa",
         )
+        st.write(f"**ISA annual return:** {expected_isa_annual_return * 100:.2f}%")
         expected_sipp_annual_return = st.slider(
             "SIPP expected annual return (%)",
             0.0,
@@ -653,6 +655,7 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             step=0.001,
             key="roi_sipp",
         )
+        st.write(f"**SIPP annual return:** {expected_sipp_annual_return * 100:.2f}%")
         expected_workplace_annual_return = st.slider(
             "Workplace pension expected annual return (%)",
             0.0,
@@ -660,6 +663,9 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             0.05,
             step=0.001,
             key="roi_workplace",
+        )
+        st.write(
+            f"**Workplace Pension annual return:** {expected_workplace_annual_return * 100:.2f}%"
         )
         expected_inflation = st.slider(
             "Expected inflation rate (%)",
@@ -669,6 +675,7 @@ def _returns_and_inflation_section() -> "ExpectedReturnsAndInflation":
             step=0.001,
             key="inflation",
         )
+        st.write(f"**Expected inflation rate:** {expected_inflation * 100:.2f}%")
         return ExpectedReturnsAndInflation(
             expected_lisa_annual_return=expected_lisa_annual_return,
             expected_isa_annual_return=expected_isa_annual_return,

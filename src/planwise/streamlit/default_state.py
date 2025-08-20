@@ -48,6 +48,7 @@ def reset_default_state() -> None:
 from planwise.profile import (
     AccountBalances,
     ContributionSettings,
+    ExpectedReturnsAndInflation,
     ProfileSettings,
     get_isa_contribution_rate,
     get_personal_details,
@@ -154,6 +155,19 @@ def convert_streamlit_state_to_profile() -> None:
         lisa_contribution=lisa_contribution,
     )
 
+    expected_lisa_annual_return = st.session_state.get("roi_lisa", 0.05)
+    expected_isa_annual_return = st.session_state.get("roi_isa", 0.05)
+    expected_sipp_annual_return = st.session_state.get("roi_sipp", 0.05)
+    expected_workplace_annual_return = st.session_state.get("roi_workplace", 0.05)
+    expected_inflation = st.session_state.get("inflation", 0.02)
+    expected_returns_and_inflation = ExpectedReturnsAndInflation(
+        expected_lisa_annual_return=expected_lisa_annual_return,
+        expected_isa_annual_return=expected_isa_annual_return,
+        expected_sipp_annual_return=expected_sipp_annual_return,
+        expected_workplace_annual_return=expected_workplace_annual_return,
+        expected_inflation=expected_inflation,
+    )
+
 
 def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> None:
     state_data: dict[str, bool | int | float] = {}
@@ -195,3 +209,19 @@ def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> N
     state_data[
         "redirectable_to_isa_contribution"
     ] = profile_settings.post_50_contribution_settings.post_50_lisa_to_isa_contribution
+
+    state_data[
+        "roi_lisa"
+    ] = profile_settings.expected_returns_and_inflation.expected_lisa_annual_return
+    state_data[
+        "roi_isa"
+    ] = profile_settings.expected_returns_and_inflation.expected_isa_annual_return
+    state_data[
+        "roi_sipp"
+    ] = profile_settings.expected_returns_and_inflation.expected_sipp_annual_return
+    state_data[
+        "roi_workplace"
+    ] = profile_settings.expected_returns_and_inflation.expected_workplace_annual_return
+    state_data[
+        "inflation"
+    ] = profile_settings.expected_returns_and_inflation.expected_inflation
