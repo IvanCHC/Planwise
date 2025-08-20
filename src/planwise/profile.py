@@ -7,6 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Union
 
 from .databases import LIMITS_DB
 from .ni import calculate_ni
@@ -37,7 +38,7 @@ def save_profile(name: str, profile_settings: "ProfileSettings") -> None:
     serialise_profile_settings_to_json(profile_settings, file_path)
 
 
-def load_profile(name: str) -> "ProfileSettings" | None:
+def load_profile(name: str) -> Union["ProfileSettings", None]:
     p = profile_path(name)
     return deserialise_profile_settings_from_json(p) if p.exists() else None
 
