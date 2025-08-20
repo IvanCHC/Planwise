@@ -832,10 +832,11 @@ def _post_retirement_section(
                     f"⚠️ Total withdrawal amounts exceed the annual withdrawal amount by {total_withdrawal_percentage-1:.2%}. Please adjust."
                 )
             elif total_withdrawal_amount <= withdrawal_today_amount:
-                st.progress(
-                    total_withdrawal_percentage,
-                    text=f"Total Withdrawal Amount: £{total_withdrawal_amount:,.0f} ({total_withdrawal_percentage*100:.1f}%)",
-                )
+                if total_withdrawal_percentage <= 1.0:
+                    st.progress(
+                        total_withdrawal_percentage,
+                        text=f"Total Withdrawal Amount: £{total_withdrawal_amount:,.0f} ({total_withdrawal_percentage*100:.1f}%)",
+                    )
                 if total_withdrawal_amount < withdrawal_today_amount:
                     st.warning(
                         f"⚠️ Total withdrawal amounts are less than the annual withdrawal amount by {1-total_withdrawal_percentage:.2%}. Please adjust."

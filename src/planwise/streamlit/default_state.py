@@ -49,6 +49,7 @@ from planwise.profile import (
     AccountBalances,
     ContributionSettings,
     ExpectedReturnsAndInflation,
+    PostRetirementSettings,
     ProfileSettings,
     get_isa_contribution_rate,
     get_personal_details,
@@ -59,7 +60,7 @@ from planwise.profile import (
 )
 
 
-def convert_streamlit_state_to_profile() -> None:
+def convert_streamlit_state_to_profile() -> "ProfileSettings":
     tax_year = st.session_state.get("tax_year", 2025)
     scotland = st.session_state.get("scotland", False)
     use_qualifying = st.session_state.get("use_qualifying", False)
@@ -168,6 +169,59 @@ def convert_streamlit_state_to_profile() -> None:
         expected_inflation=expected_inflation,
     )
 
+    withdrawal_today_amount = st.session_state.get("postret_withdrawal_today", 0.0)
+    postret_roi_lisa = st.session_state.get("postret_roi_lisa", 0.05)
+    postret_roi_isa = st.session_state.get("postret_roi_isa", 0.05)
+    postret_roi_pension = st.session_state.get("postret_roi_pension", 0.05)
+    postret_lisa_withdrawal_age = st.session_state.get(
+        "postret_lisa_withdrawal_age", 67
+    )
+    postret_lisa_targeted_withdrawal_percentage = st.session_state.get(
+        "postret_lisa_targeted_withdrawal_percentage", 0.0
+    )
+    postret_isa_withdrawal_age = st.session_state.get("postret_isa_withdrawal_age", 67)
+    postret_isa_targeted_withdrawal_percentage = st.session_state.get(
+        "postret_isa_targeted_withdrawal_percentage", 0.0
+    )
+    postret_taxfree_pension_withdrawal_age = st.session_state.get(
+        "postret_taxfree_pension_withdrawal_age", 67
+    )
+    postret_taxfree_pension_targeted_withdrawal_percentage = st.session_state.get(
+        "postret_taxfree_pension_targeted_withdrawal_percentage", 0.0
+    )
+    postret_taxable_pension_withdrawal_age = st.session_state.get(
+        "postret_taxable_pension_withdrawal_age", 67
+    )
+    postret_taxable_pension_targeted_withdrawal_percentage = st.session_state.get(
+        "postret_taxable_pension_targeted_withdrawal_percentage", 0.0
+    )
+    post_retirement_settings = PostRetirementSettings(
+        withdrawal_today_amount=withdrawal_today_amount,
+        expected_post_retirement_lisa_annual_return=postret_roi_lisa,
+        expected_post_retirement_isa_annual_return=postret_roi_isa,
+        expected_post_retirement_pension_annual_return=postret_roi_pension,
+        postret_isa_withdrawal_age=postret_lisa_withdrawal_age,
+        postret_isa_targeted_withdrawal_percentage=postret_lisa_targeted_withdrawal_percentage,
+        postret_lisa_withdrawal_age=postret_isa_withdrawal_age,
+        postret_lisa_targeted_withdrawal_percentage=postret_isa_targeted_withdrawal_percentage,
+        postret_taxfree_pension_withdrawal_age=postret_taxfree_pension_withdrawal_age,
+        postret_taxfree_pension_targeted_withdrawal_percentage=postret_taxfree_pension_targeted_withdrawal_percentage,
+        postret_taxable_pension_withdrawal_age=postret_taxable_pension_withdrawal_age,
+        postret_taxable_pension_targeted_withdrawal_percentage=postret_taxable_pension_targeted_withdrawal_percentage,
+    )
+
+    return ProfileSettings(
+        tax_year=tax_year,
+        scotland=scotland,
+        qualifying_earnings=qualifying_earnings,
+        personal_details=personal_details,
+        contribution_settings=contribution_settings,
+        account_balances=account_balances,
+        post_50_contribution_settings=post_50_contribution_settings,
+        expected_returns_and_inflation=expected_returns_and_inflation,
+        post_retirement_settings=post_retirement_settings,
+    )
+
 
 def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> None:
     state_data: dict[str, bool | int | float] = {}
@@ -225,3 +279,56 @@ def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> N
     state_data[
         "inflation"
     ] = profile_settings.expected_returns_and_inflation.expected_inflation
+
+    state_data[
+        "postret_withdrawal_today"
+    ] = profile_settings.post_retirement_settings.withdrawal_today_amount
+    state_data[
+        "postret_roi_lisa"
+    ] = (
+        profile_settings.post_retirement_settings.expected_post_retirement_lisa_annual_return
+    )
+    state_data[
+        "postret_roi_isa"
+    ] = (
+        profile_settings.post_retirement_settings.expected_post_retirement_isa_annual_return
+    )
+    state_data[
+        "postret_roi_pension"
+    ] = (
+        profile_settings.post_retirement_settings.expected_post_retirement_pension_annual_return
+    )
+    state_data[
+        "postret_lisa_withdrawal_age"
+    ] = profile_settings.post_retirement_settings.postret_lisa_withdrawal_age
+    state_data[
+        "postret_lisa_targeted_withdrawal_percentage"
+    ] = (
+        profile_settings.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage
+    )
+    state_data[
+        "postret_isa_withdrawal_age"
+    ] = profile_settings.post_retirement_settings.postret_isa_withdrawal_age
+    state_data[
+        "postret_isa_targeted_withdrawal_percentage"
+    ] = (
+        profile_settings.post_retirement_settings.postret_isa_targeted_withdrawal_percentage
+    )
+    state_data[
+        "postret_taxfree_pension_withdrawal_age"
+    ] = profile_settings.post_retirement_settings.postret_taxfree_pension_withdrawal_age
+    state_data[
+        "postret_taxfree_pension_targeted_withdrawal_percentage"
+    ] = (
+        profile_settings.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage
+    )
+    state_data[
+        "postret_taxable_pension_withdrawal_age"
+    ] = profile_settings.post_retirement_settings.postret_taxable_pension_withdrawal_age
+    state_data[
+        "postret_taxable_pension_targeted_withdrawal_percentage"
+    ] = (
+        profile_settings.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage
+    )
+
+    st.session_state.update(state_data)
