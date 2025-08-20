@@ -1,5 +1,19 @@
 import streamlit as st
 
+from planwise.profile import (
+    AccountBalances,
+    ContributionSettings,
+    ExpectedReturnsAndInflation,
+    PostRetirementSettings,
+    ProfileSettings,
+    get_isa_contribution_rate,
+    get_personal_details,
+    get_post_50_contribution_settings,
+    get_qualifying_earnings_info,
+    get_sipp_contribution_rate,
+    get_workplace_contribution_rate,
+)
+
 
 def get_default_state() -> dict[str, int | float | bool]:
     return {
@@ -43,21 +57,6 @@ def get_default_state() -> dict[str, int | float | bool]:
 
 def reset_default_state() -> None:
     st.session_state.update(get_default_state())
-
-
-from planwise.profile import (
-    AccountBalances,
-    ContributionSettings,
-    ExpectedReturnsAndInflation,
-    PostRetirementSettings,
-    ProfileSettings,
-    get_isa_contribution_rate,
-    get_personal_details,
-    get_post_50_contribution_settings,
-    get_qualifying_earnings_info,
-    get_sipp_contribution_rate,
-    get_workplace_contribution_rate,
-)
 
 
 def convert_streamlit_state_to_profile() -> "ProfileSettings":
