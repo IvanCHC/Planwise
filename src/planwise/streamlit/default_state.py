@@ -51,6 +51,7 @@ from planwise.profile import (
     ProfileSettings,
     get_isa_contribution_rate,
     get_personal_details,
+    get_post_50_contribution_settings,
     get_qualifying_earnings_info,
     get_sipp_contribution_rate,
     get_workplace_contribution_rate,
@@ -143,6 +144,16 @@ def convert_streamlit_state_to_profile() -> None:
         workplace_pension_balance=workplace_balance,
     )
 
+    use_exact_amount_post50 = st.session_state.get("use_exact_amount_post50", False)
+    redirectable_to_isa_contribution = st.session_state.get(
+        "redirectable_to_isa_contribution", 0.0
+    )
+    post_50_contribution_settings = get_post_50_contribution_settings(
+        use_exact_amount_post50=use_exact_amount_post50,
+        redirectable_to_isa_contribution=redirectable_to_isa_contribution,
+        lisa_contribution=lisa_contribution,
+    )
+
 
 def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> None:
     state_data: dict[str, bool | int | float] = {}
@@ -179,3 +190,8 @@ def convert_profile_to_streamlit_state(profile_settings: "ProfileSettings") -> N
     state_data[
         "workplace_balance"
     ] = profile_settings.account_balances.workplace_pension_balance
+
+    state_data["use_exact_amount_post50"] = False
+    state_data[
+        "redirectable_to_isa_contribution"
+    ] = profile_settings.post_50_contribution_settings.post_50_lisa_to_isa_contribution

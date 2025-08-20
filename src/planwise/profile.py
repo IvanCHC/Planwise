@@ -347,6 +347,41 @@ class AccountBalances:
     workplace_pension_balance: float
 
 
+def get_post_50_contribution_settings(
+    use_exact_amount_post50: bool,
+    redirectable_to_isa_contribution: float,
+    lisa_contribution: float,
+) -> "Post50ContributionSettings":
+    if not use_exact_amount_post50:
+        post_50_lisa_to_isa_rate = redirectable_to_isa_contribution
+        post_50_lisa_to_isa_contribution = post_50_lisa_to_isa_rate * lisa_contribution
+        post_50_lisa_to_sipp_rate = 1.0 - post_50_lisa_to_isa_rate
+        post_50_lisa_to_sipp_contribution = (
+            post_50_lisa_to_sipp_rate * lisa_contribution
+        )
+    else:
+        post_50_lisa_to_isa_contribution = redirectable_to_isa_contribution
+        post_50_lisa_to_isa_rate = (
+            post_50_lisa_to_isa_contribution / lisa_contribution
+            if lisa_contribution > 0
+            else 0.0
+        )
+        post_50_lisa_to_sipp_contribution = (
+            lisa_contribution - post_50_lisa_to_isa_contribution
+        )
+        post_50_lisa_to_sipp_rate = (
+            post_50_lisa_to_sipp_contribution / lisa_contribution
+            if lisa_contribution > 0
+            else 0.0
+        )
+    return Post50ContributionSettings(
+        post_50_lisa_to_isa_rate=post_50_lisa_to_isa_rate,
+        post_50_lisa_to_isa_contribution=post_50_lisa_to_isa_contribution,
+        post_50_lisa_to_sipp_rate=post_50_lisa_to_sipp_rate,
+        post_50_lisa_to_sipp_contribution=post_50_lisa_to_sipp_contribution,
+    )
+
+
 @dataclass
 class Post50ContributionSettings:
     """Data class to hold post-50 contribution settings.

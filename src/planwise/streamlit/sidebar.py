@@ -20,6 +20,7 @@ from planwise.profile import (
     QualifyingEarnings,
     get_isa_contribution_rate,
     get_personal_details,
+    get_post_50_contribution_settings,
     get_qualifying_earnings_info,
     get_sipp_contribution_rate,
     get_workplace_contribution_rate,
@@ -298,25 +299,23 @@ def _contribution_rates_section(
                 st.write(
                     f"**Workplace (EE) Pension:** £{workplace_ee_contribution:,.0f} ({workplace_ee_rate*100:,.4}%)"
                 )
-                total_workplace_contribution = (
-                    workplace_er_contribution + workplace_ee_contribution * 1.25
-                )  # 25% tax relief on employee contributions
-                allowance_usage = (
-                    total_workplace_contribution
-                    / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
-                )
-                st.progress(
-                    allowance_usage,
-                    text=f"Pension Allowance Usage: £{total_workplace_contribution:.0f} ({allowance_usage*100:.3f}%)",
-                )
-                fund_usage = (
-                    workplace_ee_contribution / personal_details.take_home_salary
-                )
-                st.progress(
-                    fund_usage,
-                    text=f"Fund Usage: £{workplace_ee_contribution:.0f} ({fund_usage*100:.3f}%)",
-                )
-                total_net_contribution += workplace_ee_contribution
+            total_workplace_contribution = (
+                workplace_er_contribution + workplace_ee_contribution * 1.25
+            )  # 25% tax relief on employee contributions
+            allowance_usage = (
+                total_workplace_contribution
+                / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
+            )
+            st.progress(
+                allowance_usage,
+                text=f"Pension Allowance Usage: £{total_workplace_contribution:.0f} ({allowance_usage*100:.3f}%)",
+            )
+            fund_usage = workplace_ee_contribution / personal_details.take_home_salary
+            st.progress(
+                fund_usage,
+                text=f"Fund Usage: £{workplace_ee_contribution:.0f} ({fund_usage*100:.3f}%)",
+            )
+            total_net_contribution += workplace_ee_contribution
 
         with st.expander("Step 2. LISA & ISA Contribution", expanded=False):
             if personal_details.take_home_salary - total_net_contribution <= 0:
@@ -401,25 +400,31 @@ def _contribution_rates_section(
                     f"**ISA contribution:** £{isa_contribution:,.0f} ({isa_rate*100:,.3}%)"
                 )
 
-                total_isa_contribution = lisa_contribution + isa_contribution
-                total_net_contribution += total_isa_contribution
-                allowance_usage = (
-                    total_isa_contribution / pw.LIMITS_DB[str(tax_year)]["isa_limit"]
-                )
-                st.progress(
-                    allowance_usage,
-                    text=f"ISA/LISA Allowance Usage: {allowance_usage*100:.3f}%",
-                )
-                fund_usage = total_net_contribution / personal_details.take_home_salary
-                st.progress(
-                    fund_usage,
-                    text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)",
-                )
+            total_isa_contribution = lisa_contribution + isa_contribution
+            total_net_contribution += total_isa_contribution
+            allowance_usage = (
+                total_isa_contribution / pw.LIMITS_DB[str(tax_year)]["isa_limit"]
+            )
+            st.progress(
+                allowance_usage,
+                text=f"ISA/LISA Allowance Usage: {allowance_usage*100:.3f}%",
+            )
+            fund_usage = total_net_contribution / personal_details.take_home_salary
+            st.progress(
+                fund_usage,
+                text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)",
+            )
 
         with st.expander("Step 3. SIPP Contributions", expanded=False):
             if personal_details.take_home_salary - total_net_contribution <= 0:
                 st.warning(
                     "⚠️ You have insufficient take-home salary to contribute to SIPP."
+                )
+                sipp_rate, sipp_contribution = 0.0, 0.0
+            elif total_workplace_contribution >= pension_allowance:
+                st.warning(
+                    "⚠️ You have already reached the annual pension allowance. "
+                    "You can only contribute to SIPP if you have unused allowance."
                 )
                 sipp_rate, sipp_contribution = 0.0, 0.0
             else:
@@ -468,26 +473,26 @@ def _contribution_rates_section(
                     f"**SIPP contribution:** £{sipp_contribution:,.0f} ({sipp_rate*100:,.3}%)"
                 )
 
-                total_sipp_contribution = (
-                    sipp_contribution * 1.25
-                )  # 25% tax relief on employee contributions
-                total_net_contribution += sipp_contribution
-                total_pension_contribution = (
-                    total_workplace_contribution + total_sipp_contribution
-                )
-                allowance_usage = (
-                    total_pension_contribution
-                    / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
-                )
-                st.progress(
-                    allowance_usage,
-                    text=f"Pension Allowance Usage: {allowance_usage*100:.3f}%",
-                )
-                fund_usage = total_net_contribution / personal_details.take_home_salary
-                st.progress(
-                    fund_usage,
-                    text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)",
-                )
+            total_sipp_contribution = (
+                sipp_contribution * 1.25
+            )  # 25% tax relief on employee contributions
+            total_net_contribution += sipp_contribution
+            total_pension_contribution = (
+                total_workplace_contribution + total_sipp_contribution
+            )
+            allowance_usage = (
+                total_pension_contribution
+                / pw.LIMITS_DB[str(tax_year)]["pension_annual_allowance"]
+            )
+            st.progress(
+                allowance_usage,
+                text=f"Pension Allowance Usage: {allowance_usage*100:.3f}%",
+            )
+            fund_usage = total_net_contribution / personal_details.take_home_salary
+            st.progress(
+                fund_usage,
+                text=f"Fund Usage: £{total_net_contribution:.0f} ({fund_usage*100:.3f}%)",
+            )
 
         contribution_settings = ContributionSettings(
             workplace_er_rate=workplace_er_rate,
@@ -550,24 +555,6 @@ def _account_balances_section() -> "AccountBalances":
 def _post50_lisa_section(
     tax_year: int, contribution_settings: "ContributionSettings"
 ) -> "Post50ContributionSettings":
-    """Collect post-50 redirection preferences for LISA contributions.
-
-    Lifetime ISA contributions are only allowed until the age of 50. When the user
-    reaches this age, they may choose to divert those contributions into their
-    ISA or SIPP. This function captures that preference.
-
-    Parameters
-    ----------
-    tax_year : int
-        The tax year for which the contribution is being calculated.
-    contribution_settings : ContributionSettings
-        The current contribution settings including LISA contributions.
-
-    Returns
-    -------
-    Post50ContributionSettings
-        A dataclass instance containing the post-50 LISA redirection settings.
-    """
     with st.sidebar.expander("Post-50 LISA Redirection", expanded=False):
         with st.container(horizontal_alignment="right"):
             use_exact_amount = st.toggle(
@@ -580,10 +567,9 @@ def _post50_lisa_section(
                 "⚠️ You have already reached the annual pension allowance. "
                 "You can only redirect LISA contributions to ISA."
             )
-            shift_lisa_to_isa = 1.0
-            shift_lisa_to_sipp = 0.0
-            redirectable_to_isa = contribution_settings.lisa_contribution
-            redirectable_to_sipp = 0.0
+            redirectable_to_isa_contribution = (
+                1.0 if not use_exact_amount else contribution_settings.lisa_contribution
+            )
         else:
             lisa_contribution = contribution_settings.lisa_contribution
             unused_allowance = (
@@ -598,45 +584,38 @@ def _post50_lisa_section(
                     ),
                     0.0,
                 )
-                shift_lisa_to_isa = st.slider(
+                redirectable_to_isa_contribution = st.slider(
                     "Redirect LISA contribution to ISA (%)",
                     minimum_lisa_redirectable,
                     1.0,
                     1.0,
                     step=0.05,
-                    key="redirectable_to_isa",
+                    key="redirectable_to_isa_contribution",
                 )
-                shift_lisa_to_sipp = 1.0 - shift_lisa_to_isa
-                redirectable_to_isa = shift_lisa_to_isa * lisa_contribution
-                redirectable_to_sipp = shift_lisa_to_sipp * lisa_contribution
             else:
                 minimum_lisa_redirectable = max(
                     lisa_contribution - unused_allowance, 0.0
                 )
-                redirectable_to_isa = st.number_input(
+                redirectable_to_isa_contribution = st.number_input(
                     "Redirect LISA contribution to ISA (£)",
                     min_value=minimum_lisa_redirectable,
                     max_value=lisa_contribution,
                     value=lisa_contribution,
                     step=100.0,
-                    key="redirectable_to_isa",
+                    key="redirectable_to_isa_contribution",
                 )
-                redirectable_to_sipp = lisa_contribution - redirectable_to_isa
-                shift_lisa_to_isa = redirectable_to_isa / lisa_contribution
-                shift_lisa_to_sipp = redirectable_to_sipp / lisa_contribution
-            st.write(
-                f"**Redirectable to ISA**: £{redirectable_to_isa:.0f} ({shift_lisa_to_isa:.0%})"
-            )
-            st.write(
-                f"**Redirectable to SIPP**: £{redirectable_to_sipp:.0f} ({shift_lisa_to_sipp:.0%})"
-            )
+        post50_contribution_settings = get_post_50_contribution_settings(
+            use_exact_amount_post50=use_exact_amount,
+            redirectable_to_isa_contribution=redirectable_to_isa_contribution,
+            lisa_contribution=contribution_settings.lisa_contribution,
+        )
+        st.write(
+            f"**Redirectable to ISA**: £{post50_contribution_settings.post_50_lisa_to_isa_contribution:.0f} ({post50_contribution_settings.post_50_lisa_to_isa_rate:.0%})"
+        )
+        st.write(
+            f"**Redirectable to SIPP**: £{post50_contribution_settings.post_50_lisa_to_sipp_contribution:.0f} ({post50_contribution_settings.post_50_lisa_to_sipp_rate:.0%})"
+        )
 
-    post50_contribution_settings = Post50ContributionSettings(
-        post_50_lisa_to_isa_rate=shift_lisa_to_isa,
-        post_50_lisa_to_sipp_rate=shift_lisa_to_sipp,
-        post_50_lisa_to_isa_contribution=redirectable_to_isa,
-        post_50_lisa_to_sipp_contribution=redirectable_to_sipp,
-    )
     return post50_contribution_settings
 
 
