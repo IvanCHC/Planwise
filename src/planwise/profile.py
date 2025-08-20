@@ -32,17 +32,14 @@ def list_profiles() -> list[str]:
     return sorted(p.stem for p in PROFILES_DIR.glob("*.json"))
 
 
-def save_profile(name: str, data: dict) -> None:
+def save_profile(name: str, profile_settings: "ProfileSettings") -> None:
     file_path = profile_path(name)
-    # profile_settings = ProfileSettings(**data)
-    # serialise_profile_settings_to_json(profile_settings, file_path)
-    file_path.write_text(json.dumps(data, indent=2))
+    serialise_profile_settings_to_json(profile_settings, file_path)
 
 
-def load_profile(name: str) -> dict | None:
+def load_profile(name: str) -> "ProfileSettings" | None:
     p = profile_path(name)
-    # return deserialise_profile_settings_from_json(p) if p.exists() else None
-    return json.loads(p.read_text()) if p.exists() else None
+    return deserialise_profile_settings_from_json(p) if p.exists() else None
 
 
 def delete_profile(name: str) -> None:
@@ -52,7 +49,7 @@ def delete_profile(name: str) -> None:
 
 
 def serialise_profile_settings_to_json(
-    profile_settings: "ProfileSettings", file_path: str
+    profile_settings: "ProfileSettings", file_path: Path
 ) -> None:
     """Serialise a ProfileSettings object into a JSON file.
 
@@ -78,7 +75,7 @@ def serialise_profile_settings_to_json(
         json.dump(data, json_file, indent=2)
 
 
-def deserialise_profile_settings_from_json(file_path: str) -> "ProfileSettings":
+def deserialise_profile_settings_from_json(file_path: Path) -> "ProfileSettings":
     """Deserialise a JSON file into a ProfileSettings object.
 
     Parameters

@@ -884,9 +884,6 @@ def sidebar_inputs() -> "ProfileSettings":
         tax_year, personal_details, expected_returns_and_inflation
     )
 
-    st.sidebar.divider()
-    render_profiles_manager()
-
     profile_settings = ProfileSettings(
         tax_year=tax_year,
         scotland=scotland,
@@ -898,4 +895,9 @@ def sidebar_inputs() -> "ProfileSettings":
         expected_returns_and_inflation=expected_returns_and_inflation,
         post_retirement_settings=post_retirement_settings,
     )
+    st.session_state["profile_settings"] = profile_settings
+
+    st.sidebar.divider()
+    render_profiles_manager()
+
     return profile_settings
