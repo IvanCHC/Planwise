@@ -204,10 +204,10 @@ Get NI bands for a given year and category.
 
 ## Command Line Interface
 
-Planwise provides a command‑line interface (CLI) via the `planwise`
+Planwise provides a command-line interface (CLI) via the `planwise`
 console script.  It allows you to run retirement projections without
 writing any code.  Contribution rates are expressed as fractions of your
-*take‑home salary* (gross salary minus income tax and National Insurance).
+*take-home salary* (gross salary minus income tax and National Insurance).
 The CLI automatically calculates your net pay based on the selected tax
 year and whether you are a Scottish taxpayer, ensuring that contribution
 limits and pension annual allowance rules are applied consistently.
@@ -221,7 +221,7 @@ planwise --current-age 30 --retirement-age 67 --salary 40000
 ```
 
 This runs a projection using default contribution rates and prints a
-detailed year‑by‑year table to the terminal.
+detailed year-by-year table to the terminal.
 
 ### Options
 
@@ -230,17 +230,17 @@ detailed year‑by‑year table to the terminal.
 | `--current-age` | Current age of the individual (default: 30) |
 | `--retirement-age` | Age at which saving stops and projection ends (default: 67) |
 | `--salary` | Gross annual salary in pounds (required) |
-| `--lisa-rate` | Fraction of take‑home pay contributed to a Lifetime ISA (default: 0.05) |
-| `--isa-rate` | Fraction of take‑home pay contributed to a Stocks & Shares ISA (default: 0.05) |
-| `--sipp-employee-rate` | Employee contribution to a SIPP as a fraction of take‑home pay (default: 0.05) |
-| `--sipp-employer-rate` | Employer contribution to a SIPP as a fraction of take‑home pay (default: 0.0) |
+| `--lisa-rate` | Fraction of take-home pay contributed to a Lifetime ISA (default: 0.05) |
+| `--isa-rate` | Fraction of take-home pay contributed to a Stocks & Shares ISA (default: 0.05) |
+| `--sipp-employee-rate` | Employee contribution to a SIPP as a fraction of take-home pay (default: 0.05) |
+| `--sipp-employer-rate` | Employer contribution to a SIPP as a fraction of take-home pay (default: 0.0) |
 | `--workplace-employee-rate` | Employee contribution to the workplace pension (default: 0.05) |
 | `--workplace-employer-rate` | Employer contribution to the workplace pension (default: 0.03) |
 | `--shift-lisa-to-isa` | After age 50, fraction of the former LISA contribution redirected to the ISA (default: 0.5) |
 | `--shift-lisa-to-sipp` | After age 50, fraction of the former LISA contribution redirected to the SIPP (default: 0.5) |
 | `--roi-<wrapper>` | Expected annual return for each wrapper (`lisa`, `isa`, `sipp`, `workplace`; default 0.05) |
 | `--inflation` | Annual inflation assumption (default: 0.02) |
-| `--scotland` | Use Scottish income tax bands instead of rest‑of‑UK |
+| `--scotland` | Use Scottish income tax bands instead of rest-of-UK |
 | `--use-qualifying-earnings` | Calculate workplace contributions on qualifying earnings instead of full salary |
 | `--tax-year` | Tax year used for allowances and tax bands (default: latest available) |
 | `--summary` | Display a concise summary of the final pot values instead of the full table |
@@ -274,7 +274,7 @@ will receive an informative error message.
 Visualization of projection data is provided by the :class:`planwise.plotting.RetirementPlotter` class.  The class accepts a DataFrame from :func:`planwise.core.project_retirement` and exposes methods to build Altair charts for contributions, pot growth and a combined view:
 
 * ``RetirementPlotter.contribution_chart(title=None)`` - return a stacked bar chart showing the share of net contributions by account.  Pass a custom ``title`` to override the default.
-* ``RetirementPlotter.growth_chart(title=None)`` - return a line chart showing both pot values and accumulated contributions for each account.  Pots are drawn with solid lines while accumulated contributions are drawn with dashed lines.  If the DataFrame lacks pre‑computed accumulated columns, cumulative sums of the annual net contributions are computed on the fly.
+* ``RetirementPlotter.growth_chart(title=None)`` - return a line chart showing both pot values and accumulated contributions for each account.  Pots are drawn with solid lines while accumulated contributions are drawn with dashed lines.  If the DataFrame lacks pre-computed accumulated columns, cumulative sums of the annual net contributions are computed on the fly.
 * ``RetirementPlotter.combined_chart(contrib_title=None, growth_title=None)`` - horizontally concatenate the contributions and growth charts into a single figure.
 
 For convenience and backward compatibility, the module still exports the functions ``make_contribution_plot(df, title=None)``, ``make_growth_plot(df, title=None)`` and ``make_combined_plot(df)`` which simply instantiate a :class:`RetirementPlotter` internally and delegate to the corresponding methods.
@@ -312,9 +312,9 @@ The library implements 2025/26 tax year rules:
 
 This is a simplified model that:
 * Assumes tax rules remain constant
-* Ignores carry‑forward of unused allowances
-* Uses relief‑at‑source for pension contributions
-* Includes National Insurance and income tax only to calculate take‑home salary;
+* Ignores carry-forward of unused allowances
+* Uses relief-at-source for pension contributions
+* Includes National Insurance and income tax only to calculate take-home salary;
   it does **not** simulate NI or tax payments beyond the contribution stage
 * Uses simplified growth assumptions
 

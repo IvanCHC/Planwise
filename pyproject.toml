@@ -33,7 +33,7 @@ dependencies = [
 # Relax the minimum Python requirement so the package can be installed and tested
 # under the container's Python runtime (Python 3.11). Using a more flexible
 # version constraint allows developers on slightly older interpreters to run
-# this code without having to install a bleeding‑edge version.
+# this code without having to install a bleeding-edge version.
 requires-python = ">=3.11"
 
 [project.optional-dependencies]

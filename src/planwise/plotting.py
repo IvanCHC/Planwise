@@ -11,9 +11,9 @@ interface is now the :class:`RetirementPlotter` class which encapsulates the
 preparation of data and construction of Altair charts.
 
 The refactoring into a class makes it easier to customise the plotting logic
-and reuse common transformations.  In addition to the Altair‑based plots used
-pre‑retirement, the module still provides a number of Plotly functions for
-visualising post‑retirement withdrawals and account balances.
+and reuse common transformations.  In addition to the Altair-based plots used
+pre-retirement, the module still provides a number of Plotly functions for
+visualising post-retirement withdrawals and account balances.
 """
 
 import altair as alt

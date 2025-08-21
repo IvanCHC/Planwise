@@ -14,7 +14,7 @@ explain the purpose of each section and important calculations.
 The high-level flow is:
 
 1. The sidebar collects user inputs: personal details, tax settings,
-   contribution rates, post‑50 LISA redirection, and expected returns.
+   contribution rates, post-50 LISA redirection, and expected returns.
 2. These values are combined to instantiate planwise objects that model
    retirement growth.
 3. The main area displays summary metrics, a breakdown of final pot values,

@@ -78,9 +78,9 @@ print(results.head())
 
 ### Command Line Interface
 
-The `planwise` command provides a quick, non‑interactive way to generate a
+The `planwise` command provides a quick, non-interactive way to generate a
 retirement projection from the terminal.  Contribution rates are expressed as
-fractions of your *take‑home salary* (gross salary minus income tax and
+fractions of your *take-home salary* (gross salary minus income tax and
 National Insurance).  The CLI automatically computes income tax and NI
 deductions based on the selected tax year and region (Scottish or rest of
 UK) before applying your contribution percentages.  This mirrors the
@@ -95,22 +95,22 @@ Key options include:
 | `--current-age` | Current age of the individual (default: 30) |
 | `--retirement-age` | Age at which saving stops and projection ends (default: 67) |
 | `--salary` | Gross annual salary in pounds (required) |
-| `--lisa-rate` | Fraction of take‑home pay contributed to a Lifetime ISA (default: 0.05) |
-| `--isa-rate` | Fraction of take‑home pay contributed to a Stocks & Shares ISA (default: 0.05) |
-| `--sipp-employee-rate` | Employee contribution to a Self‑Invested Personal Pension as a fraction of take‑home pay (default: 0.05) |
-| `--sipp-employer-rate` | Employer contribution to a SIPP as a fraction of take‑home pay (default: 0.0) |
+| `--lisa-rate` | Fraction of take-home pay contributed to a Lifetime ISA (default: 0.05) |
+| `--isa-rate` | Fraction of take-home pay contributed to a Stocks & Shares ISA (default: 0.05) |
+| `--sipp-employee-rate` | Employee contribution to a Self-Invested Personal Pension as a fraction of take-home pay (default: 0.05) |
+| `--sipp-employer-rate` | Employer contribution to a SIPP as a fraction of take-home pay (default: 0.0) |
 | `--workplace-employee-rate` | Employee contribution to the workplace pension (default: 0.05) |
 | `--workplace-employer-rate` | Employer contribution to the workplace pension (default: 0.03) |
 | `--shift-lisa-to-isa` | After age 50, fraction of the former LISA contribution redirected to the ISA (default: 0.5) |
 | `--shift-lisa-to-sipp` | After age 50, fraction of the former LISA contribution redirected to the SIPP (default: 0.5) |
 | `--roi-*` | Expected annual return for each wrapper (`--roi-lisa`, `--roi-isa`, `--roi-sipp`, `--roi-workplace`; default 0.05) |
 | `--inflation` | Annual inflation assumption (default: 0.02) |
-| `--scotland` | Use Scottish income tax bands instead of rest‑of‑UK |
+| `--scotland` | Use Scottish income tax bands instead of rest-of-UK |
 | `--use-qualifying-earnings` | Calculate workplace contributions on qualifying earnings instead of full salary |
 | `--tax-year` | Tax year used for allowances and tax bands (default: latest available) |
 | `--summary` | Display a concise summary of the final pot values rather than the full table |
 | `--output` | Path to write the full results as a CSV file |
-| `--config` | Load CLI arguments from a JSON configuration file (keys match the long‑form flag names without dashes) |
+| `--config` | Load CLI arguments from a JSON configuration file (keys match the long-form flag names without dashes) |
 
 #### Examples
 
