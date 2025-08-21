@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "planwise"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Python library for modeling retirement savings across various UK tax wrappers including Lifetime ISA (LISA), Stocks & Shares ISA, Self-Invested Personal Pension (SIPP) and workplace pensions."
 readme = "README.md"
 license = "MIT"
@@ -33,17 +33,17 @@ dependencies = [
 # Relax the minimum Python requirement so the package can be installed and tested
 # under the container's Python runtime (Python 3.11). Using a more flexible
 # version constraint allows developers on slightly older interpreters to run
-# this code without having to install a bleeding‑edge version.
+# this code without having to install a bleeding-edge version.
 requires-python = ">=3.11"
 
 [project.optional-dependencies]
 plotting = [
     "altair>=5.0.0",
-    "plotly>=5.0.0",
 ]
 app = [
-    "streamlit>=1.28.0",
+    "streamlit>=1.48.0",
     "altair>=5.0.0",
+    "openpyxl>=3.1.5"
 ]
 dev = [
     "pytest>=7.0.0",
@@ -66,7 +66,6 @@ all = [
 [project.urls]
 Documentation = "https://github.com/ivanchc/planwise#readme"
 Repository = "https://github.com/ivanchc/planwise"
-Changelog = "https://github.com/ivanchc/planwise/blob/main/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/ivanchc/planwise/issues"
 
 [project.scripts]
@@ -82,7 +81,6 @@ include = [
     "/docs",
     "/README.md",
     "/LICENSE",
-    "/CHANGELOG.md",
 ]
 
 # Black configuration

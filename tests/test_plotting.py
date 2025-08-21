@@ -1,229 +1,171 @@
-"""
-Tests for plotting functionality in Planwise.
-
-These tests cover the creation and structure of Altair charts for contributions and pot growth,
-as well as integration with real projection data.
-"""
-
+import altair as alt
 import pandas as pd
-import pytest
 
-from planwise.plotting import RetirementPlotter
-
-
-@pytest.fixture
-def sample_projection_data():
-    """
-    Create sample projection data for testing plotting functions.
-    Returns:
-        pd.DataFrame: Sample projection data.
-    """
-    data = {
-        "Age": [30, 31, 32],
-        "Salary": [40000, 40800, 41616],
-        "LISA Net": [2000, 2040, 2081],
-        "LISA Bonus": [500, 510, 520],
-        "ISA Net": [2000, 2040, 2081],
-        "SIPP Employee Net": [2000, 2040, 2081],
-        "SIPP Employee Gross": [2500, 2550, 2601],
-        "SIPP Employer": [0, 0, 0],
-        "Workplace Employee Net": [2000, 2040, 2081],
-        "Workplace Employee Gross": [2500, 2550, 2601],
-        "Workplace Employer": [1200, 1224, 1248],
-        "Tax Relief (total)": [1000, 1020, 1040],
-        "Tax Refund": [200, 204, 208],
-        "Net Contribution Cost": [7800, 7956, 8115],
-        "Pot LISA": [2500, 5125, 7856],
-        "Pot ISA": [2000, 4100, 6302],
-        "Pot SIPP": [2500, 5125, 7856],
-        "Pot Workplace": [3700, 7585, 11680],
-    }
-    return pd.DataFrame(data)
+from planwise import plotting
 
 
-class TestMakeContributionPlot:
-    """
-    Test the contribution plotting function.
-    """
-
-    def test_contribution_plot_creation(self, sample_projection_data):
-        """
-        Test that contribution plot is created successfully and is an Altair chart.
-        """
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.contribution_chart()
-
-        # Check it's an Altair chart
-        assert hasattr(chart, "to_dict")
-
-        # Check the chart configuration
-        chart_dict = chart.to_dict()
-        assert chart_dict["mark"]["type"] == "bar"
-        assert "encoding" in chart_dict
-
-    def test_contribution_plot_with_custom_title(self, sample_projection_data):
-        """
-        Test contribution plot with a custom title.
-        """
-        custom_title = "Custom Contribution Analysis"
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.contribution_chart(title=custom_title)
-
-        chart_dict = chart.to_dict()
-        assert chart_dict["title"] == custom_title
-
-    def test_contribution_plot_data_structure(self, sample_projection_data):
-        """
-        Test that the plot uses the correct data structure and encodings.
-        """
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.contribution_chart()
-        chart_dict = chart.to_dict()
-
-        # Check encoding uses the right fields
-        assert "x" in chart_dict["encoding"]
-        assert "y" in chart_dict["encoding"]
-        assert "color" in chart_dict["encoding"]
+def test_plot_pie_chart_breakdown_normal():
+    breakdown = {"ISA": 1000, "SIPP": 2000, "LISA": 500}
+    chart = plotting.plot_pie_chart_breakdown(breakdown)
+    assert isinstance(chart, alt.LayerChart)
 
 
-class TestMakeGrowthPlot:
-    """
-    Test the growth plotting function.
-    """
-
-    def test_growth_plot_creation(self, sample_projection_data):
-        """
-        Test that growth plot is created successfully and is an Altair chart.
-        """
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.growth_chart()
-
-        # Check it's an Altair chart
-        assert hasattr(chart, "to_dict")
-
-        # Check the chart configuration
-        chart_dict = chart.to_dict()
-        assert chart_dict["mark"]["type"] == "line"
-        assert "encoding" in chart_dict
-
-    def test_growth_plot_with_custom_title(self, sample_projection_data):
-        """
-        Test growth plot with a custom title.
-        """
-        custom_title = "Custom Growth Analysis"
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.growth_chart(title=custom_title)
-
-        chart_dict = chart.to_dict()
-        assert chart_dict["title"] == custom_title
-
-    def test_growth_plot_data_structure(self, sample_projection_data):
-        """
-        Test that the plot uses the correct data structure and encodings.
-        """
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.growth_chart()
-        chart_dict = chart.to_dict()
-
-        # Check encoding uses the right fields
-        assert "x" in chart_dict["encoding"]
-        assert "y" in chart_dict["encoding"]
-        assert "color" in chart_dict["encoding"]
+def test_plot_pie_chart_breakdown_empty():
+    chart = plotting.plot_pie_chart_breakdown({})
+    assert isinstance(chart, alt.Chart)
 
 
-class TestMakeCombinedPlot:
-    """
-    Test the combined plotting function.
-    """
-
-    def test_combined_plot_creation(self, sample_projection_data):
-        """
-        Test that combined plot is created successfully and is an Altair chart.
-        """
-        builder = RetirementPlotter(sample_projection_data)
-        chart = builder.combined_chart()
-
-        # Check it's an Altair chart
-        assert hasattr(chart, "to_dict")
-
-        # Should be a horizontal concatenation
-        chart_dict = chart.to_dict()
-        assert "hconcat" in chart_dict
+def test_plot_annual_contribution_chart_normal():
+    df = pd.DataFrame(
+        {
+            "Age": [30, 31],
+            "LISA Net": [100, 150],
+            "ISA Net": [200, 250],
+            "SIPP Net": [300, 350],
+            "Workplace EE Net": [400, 450],
+        }
+    )
+    chart = plotting.plot_annual_contribution_chart(df)
+    assert isinstance(chart, alt.Chart)
 
 
-@pytest.mark.integration
-class TestPlottingIntegration:
-    """
-    Integration tests for plotting with real projection data.
-    """
+def test_plot_annual_contribution_chart_empty():
+    df = pd.DataFrame(
+        {
+            "Age": [],
+            "LISA Net": [],
+            "ISA Net": [],
+            "SIPP Net": [],
+            "Workplace EE Net": [],
+        }
+    )
+    chart = plotting.plot_annual_contribution_chart(df)
+    assert isinstance(chart, alt.Chart)
 
-    def test_plotting_with_real_projection(self):
-        """
-        Test plotting functions work with real projection data from the core module.
-        """
-        # This would require importing core module
-        # Skip if altair not available
-        try:
-            import altair as alt
-        except ImportError:
-            pytest.skip("Altair not available")
 
-        from planwise.core import (
-            ContributionRates,
-            InvestmentReturns,
-            UserProfile,
-            project_retirement,
-        )
+def test_plot_growth_projection_chart_normal():
+    df = pd.DataFrame(
+        {
+            "Age": [30, 31],
+            "Portfolio Balance": [1000, 1100],
+            "LISA Balance": [200, 220],
+            "ISA Balance": [300, 330],
+            "SIPP Balance": [400, 440],
+            "Workplace Balance": [500, 550],
+        }
+    )
+    chart = plotting.plot_growth_projection_chart(df)
+    assert isinstance(chart, alt.Chart)
 
-        # Run a small projection using the new dataclass-based interface
-        user = UserProfile(
-            current_age=30,
-            retirement_age=33,
-            salary=40000,
-            scotland=False,
-        )
-        contrib = ContributionRates(
-            lisa=0.05,
-            isa=0.05,
-            sipp_employee=0.05,
-            sipp_employer=0.0,
-            workplace_employee=0.05,
-            workplace_employer=0.03,
-            shift_lisa_to_isa=0.5,
-            shift_lisa_to_sipp=0.5,
-        )
-        returns = InvestmentReturns(
-            lisa=0.05,
-            isa=0.05,
-            sipp=0.05,
-            workplace=0.05,
-        )
-        from planwise.core import IncomeBreakdown
 
-        income = IncomeBreakdown(
-            salary=user.salary,
-            take_home_salary=user.salary,
-            income_tax=0.0,
-            ni_due=0.0,
-        )
-        result = project_retirement(
-            user=user,
-            contrib=contrib,
-            returns=returns,
-            income=income,
-            inflation=0.02,
-            use_qualifying_earnings=True,
-            year=2025,
-        )
+def test_plot_growth_projection_chart_empty():
+    df = pd.DataFrame(
+        {
+            "Age": [],
+            "Portfolio Balance": [],
+            "LISA Balance": [],
+            "ISA Balance": [],
+            "SIPP Balance": [],
+            "Workplace Balance": [],
+        }
+    )
+    chart = plotting.plot_growth_projection_chart(df)
+    assert isinstance(chart, alt.Chart)
 
-        # Create a plotter and test all chart methods
-        builder = RetirementPlotter(result)
-        charts = [
-            builder.contribution_chart(),
-            builder.growth_chart(),
-            builder.combined_chart(),
-        ]
-        for chart in charts:
-            assert hasattr(chart, "to_dict")
-            chart_dict = chart.to_dict()
-            assert isinstance(chart_dict, dict)
+
+def test_plot_withdrawals_by_account_chart_normal():
+    df = pd.DataFrame(
+        {
+            "Age": [65, 66],
+            "Withdrawal LISA Today": [100, 110],
+            "Withdrawal ISA Today": [200, 210],
+            "Withdrawal Tax-Free Pension Today": [300, 310],
+            "Withdrawal Taxable Pension Today": [400, 410],
+            "Withdrawal State Pension Today": [500, 510],
+            "Withdrawal Shortfall Today": [0, 0],
+        }
+    )
+    chart = plotting.plot_withdrawals_by_account_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_withdrawals_by_account_chart_empty():
+    df = pd.DataFrame(
+        {
+            "Age": [],
+            "Withdrawal LISA Today": [],
+            "Withdrawal ISA Today": [],
+            "Withdrawal Tax-Free Pension Today": [],
+            "Withdrawal Taxable Pension Today": [],
+            "Withdrawal State Pension Today": [],
+            "Withdrawal Shortfall Today": [],
+        }
+    )
+    chart = plotting.plot_withdrawals_by_account_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_total_withdrawals_chart_normal():
+    df = pd.DataFrame(
+        {
+            "Age": [65, 66],
+            "Total Withdrawal Today": [1000, 1100],
+            "Total Withdrawal After Tax Today": [900, 1000],
+            "Income Tax Today": [100, 100],
+        }
+    )
+    chart = plotting.plot_total_withdrawals_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_total_withdrawals_chart_empty():
+    df = pd.DataFrame(
+        {
+            "Age": [],
+            "Total Withdrawal Today": [],
+            "Total Withdrawal After Tax Today": [],
+            "Income Tax Today": [],
+        }
+    )
+    chart = plotting.plot_total_withdrawals_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_balances_by_account_chart_normal():
+    df = pd.DataFrame(
+        {
+            "Age": [65, 66],
+            "LISA Balance Today": [100, 110],
+            "ISA Balance Today": [200, 210],
+            "Tax-Free Pension Balance Today": [300, 310],
+            "Taxable Pension Balance Today": [400, 410],
+        }
+    )
+    chart = plotting.plot_balances_by_account_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_balances_by_account_chart_empty():
+    df = pd.DataFrame(
+        {
+            "Age": [],
+            "LISA Balance Today": [],
+            "ISA Balance Today": [],
+            "Tax-Free Pension Balance Today": [],
+            "Taxable Pension Balance Today": [],
+        }
+    )
+    chart = plotting.plot_balances_by_account_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_total_balance_chart_normal():
+    df = pd.DataFrame({"Age": [65, 66], "Total Balance Today": [1000, 1100]})
+    chart = plotting.plot_total_balance_chart(df)
+    assert isinstance(chart, alt.Chart)
+
+
+def test_plot_total_balance_chart_empty():
+    df = pd.DataFrame({"Age": [], "Total Balance Today": []})
+    chart = plotting.plot_total_balance_chart(df)
+    assert isinstance(chart, alt.Chart)
