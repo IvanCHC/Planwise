@@ -66,7 +66,6 @@ all = [
 [project.urls]
 Documentation = "https://github.com/ivanchc/planwise#readme"
 Repository = "https://github.com/ivanchc/planwise"
-Changelog = "https://github.com/ivanchc/planwise/blob/main/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/ivanchc/planwise/issues"
 
 [project.scripts]
@@ -82,7 +81,6 @@ include = [
     "/docs",
     "/README.md",
     "/LICENSE",
-    "/CHANGELOG.md",
 ]
 
 # Black configuration

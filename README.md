@@ -198,7 +198,3 @@ Assumptions:
 - Pension contributions use the relief-at-source method.
 - National Insurance contributions are excluded.
 - Growth projections are simplified.
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a list of changes.
