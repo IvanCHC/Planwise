@@ -1,7 +1,11 @@
 """
 Streamlit application for UK investment and retirement planning.
 
-This app provides an interactive interface to the planwise library, enabling users to model the growth of their retirement savings across key UK tax wrappers (LISA, ISA, SIPP, workplace pension). Users can input personal details, tax settings, contribution rates, and expected returns to generate projections and visualizations.
+This app provides an interactive interface to the planwise library, enabling
+users to model the growth of their retirement savings across key UK tax wrappers
+(LISA, ISA, SIPP, workplace pension). Users can input personal details, tax
+settings, contribution rates, and expected returns to generate projections
+and visualizations.
 
 Features:
 - Sidebar for collecting user inputs and assumptions
@@ -9,7 +13,9 @@ Features:
 - Downloadable investment and retirement projections (CSV/Excel)
 - Modular UI for maintainability and clarity
 
-Note: This model is a simplification and does not account for carry forward of unused allowances or all pension tax relief scenarios. For personalised advice, consult a financial adviser.
+Note: This model is a simplification and does not account for carry forward of unused
+allowances or all pension tax relief scenarios. For personalised advice, consult a
+financial adviser.
 """
 
 import os
