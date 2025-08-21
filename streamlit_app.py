@@ -68,6 +68,36 @@ def download_investment_projection(
         )
 
 
+def download_retirement_projection(
+    df: pd.DataFrame, current_age: int, retirement_age: int
+) -> None:
+    st.subheader("Export Data")
+    csv = df.to_csv(index=False)
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Projection")
+    excel_bytes = buf.getvalue()  # raw XLSX bytes
+
+    st.write("Retirement projection:")
+    col1, col2, _, _ = st.columns([1, 1, 4, 4])
+    with col1:
+        st.download_button(
+            label="as CSV",
+            data=csv,
+            file_name=f"retirement_projection_{current_age}_to_{retirement_age}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with col2:
+        st.download_button(
+            label="as Excel",
+            data=excel_bytes,
+            file_name=f"retirement_projection_{current_age}_to_{retirement_age}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+
 def main() -> None:
     favicon_path = os.path.join("src", "assets", "favicon.ico")
     favicon = Image.open(favicon_path)
@@ -106,6 +136,11 @@ def main() -> None:
         )
         if not retirement_dataframe.empty:
             render_post_retirement_analysis(profile_settings, retirement_dataframe)
+            download_retirement_projection(
+                retirement_dataframe,
+                profile_settings.personal_details.current_age,
+                profile_settings.personal_details.retirement_age,
+            )
 
 
 if __name__ == "__main__":
