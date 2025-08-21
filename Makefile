@@ -20,10 +20,6 @@ format:  ## Format code
 	black src/ tests/ streamlit_app.py
 	isort src/ tests/ streamlit_app.py
 
-format-check:  ## Check if code is formatted correctly
-	black --check src/ tests/
-	isort --check-only src/ tests/
-
 clean:  ## Clean up build artifacts
 	rm -rf build/
 	rm -rf dist/
@@ -38,19 +34,5 @@ clean:  ## Clean up build artifacts
 docs:  ## Build documentation
 	cd docs && make html
 
-build:  ## Build the package
-	python -m build
-
-upload-test:  ## Upload to test PyPI
-	python -m twine upload --repository testpypi dist/*
-
-upload:  ## Upload to PyPI
-	python -m twine upload dist/*
-
 app:  ## Run the Streamlit app
 	streamlit run streamlit_app.py
-
-cli-example:  ## Run a CLI example
-	planwise --current-age 30 --retirement-age 67 --salary 40000 --summary
-
-check-all: format-check lint test  ## Run all checks
