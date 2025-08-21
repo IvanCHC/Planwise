@@ -1,33 +1,29 @@
+"""
+Command-line interface for the Planwise library.
+
+This module provides a user-friendly CLI for running UK investment and retirement projections,
+generating reports, and saving results to CSV. It supports configuration via command-line arguments
+or a JSON config file.
+"""
+
 import argparse
+import json
 import sys
-from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
-import planwise as pw
-from planwise.profile import (
-    AccountBalances,
-    ExpectedReturnsAndInflation,
-    PostRetirementSettings,
-    ProfileSettings,
-    deserialise_profile_settings_from_json,
-    get_contribution_settings,
-    get_personal_details,
-    get_post_50_contribution_settings,
-    get_qualifying_earnings_info,
+from .core import (
+    LIMITS_DB,
+    ContributionRates,
+    InvestmentReturns,
+    UserProfile,
+    project_retirement,
 )
+from .ni import calculate_ni
 
-EPILOG = """
-Examples:
-    # Investment projection
-    planwise --current-age 30 --retirement-age 67 --salary 40000
-
-     # Save results to CSV
-    planwise --current-age 30 --retirement-age 67 --salary 40000 --output results.csv
-
-    # Load profile from JSON file
-    planwise --config config.json
-"""
+# Import tax and NI calculators so the CLI can compute take‑home pay.
+from .tax import calculate_income_tax
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -39,24 +35,27 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="UK Investment & Retirement Planning CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=EPILOG,
+        epilog="""
+Examples:
+  # Basic projection
+  planwise --current-age 30 --retirement-age 67 --salary 40000
+
+  # With custom contribution rates
+  planwise --current-age 30 --retirement-age 67 --salary 40000 \\
+    --lisa-rate 0.05 --isa-rate 0.10 --sipp-employee-rate 0.05
+
+  # Save results to CSV
+  planwise --current-age 30 --retirement-age 67 --salary 40000 \\
+    --output results.csv
+
+  # Load parameters from JSON file
+  planwise --config config.json
+        """,
     )
 
+    # Basic user parameters
     parser.add_argument(
-        "--tax-year", type=int, default=2025, help="Tax year (default: 2025)"
-    )
-    parser.add_argument(
-        "--scotland",
-        action="store_true",
-        help="Use Scottish tax rates (default: False)",
-    )
-    parser.add_argument(
-        "--use-qualifying",
-        action="store_true",
-        help="Use qualifying contributions (default: False)",
-    )
-    parser.add_argument(
-        "--current-age", type=int, default=25, help="Current age (default: 25)"
+        "--current-age", type=int, default=30, help="Current age (default: 30)"
     )
     parser.add_argument(
         "--retirement-age", type=int, default=67, help="Retirement age (default: 67)"
@@ -64,179 +63,111 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--salary",
         type=float,
-        default=30000.0,
-        help="Annual salary in £ (default: 30000)",
+        default=40000,
+        help="Annual salary in £ (default: 40000)",
     )
+
+    # Contribution rates
     parser.add_argument(
-        "--use-exact-amounts",
-        action="store_true",
-        help="Determine if contribution is rate or exact amount (default: False)",
-    )
-    parser.add_argument(
-        "--workplace-employer-contribution",
-        type=float,
-        default=0.03,
-        help="Workplace employer contribution rate (default: 0.03)",
-    )
-    parser.add_argument(
-        "--workplace-employee-contribution",
+        "--lisa-rate",
         type=float,
         default=0.05,
-        help="Workplace employee contribution rate (default: 0.05)",
+        help="LISA contribution rate (default: 0.05)",
     )
     parser.add_argument(
-        "--lisa-contribution",
+        "--isa-rate",
+        type=float,
+        default=0.05,
+        help="ISA contribution rate (default: 0.05)",
+    )
+    parser.add_argument(
+        "--sipp-employee-rate",
+        type=float,
+        default=0.05,
+        help="SIPP employee contribution rate (default: 0.05)",
+    )
+    parser.add_argument(
+        "--sipp-employer-rate",
         type=float,
         default=0.0,
-        help="LISA contribution (default: 0.0)",
+        help="SIPP employer contribution rate (default: 0.0)",
     )
     parser.add_argument(
-        "--isa-contribution",
+        "--workplace-employee-rate",
         type=float,
-        default=0.0,
-        help="ISA contribution (default: 0.0)",
+        default=0.05,
+        help="Workplace pension employee rate (default: 0.05)",
     )
     parser.add_argument(
-        "--sipp-contribution",
+        "--workplace-employer-rate",
         type=float,
-        default=0.0,
-        help="SIPP contribution (default: 0.0)",
+        default=0.03,
+        help="Workplace pension employer rate (default: 0.03)",
     )
+
+    # Post-50 redirection
     parser.add_argument(
-        "--lisa-balance",
+        "--shift-lisa-to-isa",
         type=float,
-        default=0.0,
-        help="Initial LISA balance (default: 0.0)",
+        default=0.5,
+        help="Fraction of LISA redirected to ISA after 50 (default: 0.5)",
     )
     parser.add_argument(
-        "--isa-balance",
+        "--shift-lisa-to-sipp",
         type=float,
-        default=0.0,
-        help="Initial ISA balance (default: 0.0)",
+        default=0.5,
+        help="Fraction of LISA redirected to SIPP after 50 (default: 0.5)",
     )
-    parser.add_argument(
-        "--sipp-balance",
-        type=float,
-        default=0.0,
-        help="Initial SIPP balance (default: 0.0)",
-    )
-    parser.add_argument(
-        "--workplace-balance",
-        type=float,
-        default=0.0,
-        help="Initial workplace balance (default: 0.0)",
-    )
-    parser.add_argument(
-        "--use-exact-amount-post50",
-        action="store_true",
-        help="Determine if the redirectable is exact amount or rate (default: False)",
-    )
-    parser.add_argument(
-        "--redirectable-to-isa",
-        type=float,
-        default=0.0,
-        help="Amount redirectable to ISA from LISA(default: 0.0)",
-    )
+
+    # Returns and inflation
     parser.add_argument(
         "--roi-lisa",
         type=float,
         default=0.05,
-        help="LISA return on investment (default: 0.05)",
+        help="LISA annual return (default: 0.05)",
     )
     parser.add_argument(
-        "--roi-isa",
-        type=float,
-        default=0.05,
-        help="ISA return on investment (default: 0.05)",
+        "--roi-isa", type=float, default=0.05, help="ISA annual return (default: 0.05)"
     )
     parser.add_argument(
         "--roi-sipp",
         type=float,
         default=0.05,
-        help="SIPP return on investment (default: 0.05)",
+        help="SIPP annual return (default: 0.05)",
     )
     parser.add_argument(
         "--roi-workplace",
         type=float,
         default=0.05,
-        help="Workplace return on investment (default: 0.05)",
+        help="Workplace pension annual return (default: 0.05)",
     )
     parser.add_argument(
-        "--inflation", type=float, default=0.02, help="Inflation rate (default: 0.02)"
-    )
-    parser.add_argument(
-        "--postret-withdrawal-today",
+        "--inflation",
         type=float,
-        default=0.0,
-        help="Post-retirement withdrawal today (default: 0.0)",
-    )
-    parser.add_argument(
-        "--postret-roi-lisa",
-        type=float,
-        default=0.05,
-        help="Post-retirement LISA ROI (default: 0.05)",
-    )
-    parser.add_argument(
-        "--postret-roi-isa",
-        type=float,
-        default=0.05,
-        help="Post-retirement ISA ROI (default: 0.05)",
-    )
-    parser.add_argument(
-        "--postret-roi-pension",
-        type=float,
-        default=0.05,
-        help="Post-retirement pension ROI (default: 0.05)",
-    )
-    parser.add_argument(
-        "--postret-lisa-withdrawal-age",
-        type=int,
-        default=67,
-        help="Post-retirement LISA withdrawal age (default: 67)",
-    )
-    parser.add_argument(
-        "--postret-lisa-targeted-withdrawal-percentage",
-        type=float,
-        default=0.0,
-        help="Post-retirement LISA targeted withdrawal percentage (default: 0.0)",
-    )
-    parser.add_argument(
-        "--postret-isa-withdrawal-age",
-        type=int,
-        default=67,
-        help="Post-retirement ISA withdrawal age (default: 67)",
-    )
-    parser.add_argument(
-        "--postret-isa-targeted-withdrawal-percentage",
-        type=float,
-        default=0.0,
-        help="Post-retirement ISA targeted withdrawal percentage (default: 0.0)",
-    )
-    parser.add_argument(
-        "--postret-taxfree-pension-withdrawal-age",
-        type=int,
-        default=67,
-        help="Post-retirement tax-free pension withdrawal age (default: 67)",
-    )
-    parser.add_argument(
-        "--postret-taxfree-pension-targeted-withdrawal-percentage",
-        type=float,
-        default=0.0,
-        help="Post-retirement tax-free pension targeted withdrawal percentage (default: 0.0)",
-    )
-    parser.add_argument(
-        "--postret-taxable-pension-withdrawal-age",
-        type=int,
-        default=67,
-        help="Post-retirement taxable pension withdrawal age (default: 67)",
-    )
-    parser.add_argument(
-        "--postret-taxable-pension-targeted-withdrawal-percentage",
-        type=float,
-        default=0.0,
-        help="Post-retirement taxable pension targeted withdrawal percentage (default: 0.0)",
+        default=0.02,
+        help="Annual inflation rate (default: 0.02)",
     )
 
+    # Tax settings
+    parser.add_argument(
+        "--scotland", action="store_true", help="Use Scottish tax bands"
+    )
+    parser.add_argument(
+        "--use-qualifying-earnings",
+        action="store_true",
+        default=False,
+        help="Use qualifying earnings for workplace pension (default: False)",
+    )
+
+    # Tax year
+    parser.add_argument(
+        "--tax-year",
+        type=int,
+        default=max([int(y) for y in LIMITS_DB.keys()]),
+        help="Tax year for calculations (default: latest available)",
+    )
+
+    # Configuration and output
     parser.add_argument(
         "--config", type=str, help="Load parameters from JSON config file"
     )
@@ -244,171 +175,166 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--summary", action="store_true", help="Show summary statistics"
     )
+
     return parser
 
 
-def load_profile_from_json(file_path: str) -> "ProfileSettings":
+def load_config(config_path: str) -> Any:
+    """
+    Load configuration from a JSON file.
+    Args:
+        config_path (str): Path to the JSON config file.
+    Returns:
+        dict: Loaded configuration.
+    """
     try:
-        path = Path(file_path)
-        return deserialise_profile_settings_from_json(path)
+        with open(config_path, "r") as f:
+            return json.load(f)
     except Exception as e:
-        print(f"Error loading profile json file {file_path}: {e}")
+        print(f"Error loading config file {config_path}: {e}")
         sys.exit(1)
 
 
-def convert_parser_arguments_to_profile(
-    parse: argparse.Namespace,
-) -> "ProfileSettings":
-    args = vars(parse)
-    qualifying_earnings = get_qualifying_earnings_info(
-        args["use_qualifying"], args["tax_year"]
+def print_summary(df: pd.DataFrame) -> None:
+    """
+    Print summary statistics for the retirement projection.
+    Args:
+        df (pd.DataFrame): DataFrame with projection results.
+    """
+    final_row = df.iloc[-1]
+    total_final = (
+        final_row["Pot LISA"]
+        + final_row["Pot ISA"]
+        + final_row["Pot SIPP"]
+        + final_row["Pot Workplace"]
     )
-    personal_details = get_personal_details(
-        args["current_age"],
-        args["retirement_age"],
-        args["salary"],
-        args["tax_year"],
-        args["scotland"],
-    )
-    contribution_settings = get_contribution_settings(
-        qualifying_earnings,
-        personal_details,
-        args["use_exact_amounts"],
-        args["workplace_employer_contribution"],
-        args["workplace_employee_contribution"],
-        args["lisa_contribution"],
-        args["isa_contribution"],
-        args["sipp_contribution"],
-    )
-
-    account_balances = AccountBalances(
-        lisa_balance=args["lisa_balance"],
-        isa_balance=args["isa_balance"],
-        sipp_balance=args["sipp_balance"],
-        workplace_pension_balance=args["workplace_balance"],
-    )
-
-    lisa_contribution = contribution_settings.lisa_contribution
-    post_50_contribution_settings = get_post_50_contribution_settings(
-        use_exact_amount_post50=args["use_exact_amount_post50"],
-        redirectable_to_isa_contribution=args["redirectable_to_isa"],
-        lisa_contribution=lisa_contribution,
-    )
-
-    expected_returns_and_inflation = ExpectedReturnsAndInflation(
-        expected_lisa_annual_return=args["roi_lisa"],
-        expected_isa_annual_return=args["roi_isa"],
-        expected_sipp_annual_return=args["roi_sipp"],
-        expected_workplace_annual_return=args["roi_workplace"],
-        expected_inflation=args["inflation"],
-    )
-
-    post_retirement_settings = PostRetirementSettings(
-        withdrawal_today_amount=args["postret_withdrawal_today"],
-        expected_post_retirement_lisa_annual_return=args["postret_roi_lisa"],
-        expected_post_retirement_isa_annual_return=args["postret_roi_isa"],
-        expected_post_retirement_pension_annual_return=args["postret_roi_pension"],
-        postret_isa_withdrawal_age=args["postret_isa_withdrawal_age"],
-        postret_isa_targeted_withdrawal_percentage=args[
-            "postret_isa_targeted_withdrawal_percentage"
-        ],
-        postret_lisa_withdrawal_age=args["postret_lisa_withdrawal_age"],
-        postret_lisa_targeted_withdrawal_percentage=args[
-            "postret_lisa_targeted_withdrawal_percentage"
-        ],
-        postret_taxfree_pension_withdrawal_age=args[
-            "postret_taxfree_pension_withdrawal_age"
-        ],
-        postret_taxfree_pension_targeted_withdrawal_percentage=args[
-            "postret_taxfree_pension_targeted_withdrawal_percentage"
-        ],
-        postret_taxable_pension_withdrawal_age=args[
-            "postret_taxable_pension_withdrawal_age"
-        ],
-        postret_taxable_pension_targeted_withdrawal_percentage=args[
-            "postret_taxable_pension_targeted_withdrawal_percentage"
-        ],
-    )
-    return ProfileSettings(
-        tax_year=args["tax_year"],
-        scotland=args["scotland"],
-        personal_details=personal_details,
-        qualifying_earnings=qualifying_earnings,
-        contribution_settings=contribution_settings,
-        account_balances=account_balances,
-        post_50_contribution_settings=post_50_contribution_settings,
-        expected_returns_and_inflation=expected_returns_and_inflation,
-        post_retirement_settings=post_retirement_settings,
-    )
-
-
-def print_summary(dataframe: pd.DataFrame, total_initial_balance: float) -> None:
-    total_final_balance = (
-        dataframe["LISA Balance"].iloc[-1]
-        + dataframe["ISA Balance"].iloc[-1]
-        + dataframe["SIPP Balance"].iloc[-1]
-        + dataframe["Workplace Balance"].iloc[-1]
-    )
-    final_year = dataframe.iloc[-1]
-    portfilio_balance = final_year["Portfolio Balance"]
-    net_contribution = final_year["Portfolio Net Contribution"]
-    growth = portfilio_balance - net_contribution - total_initial_balance
 
     print("\n" + "=" * 50)
     print("RETIREMENT PROJECTION SUMMARY")
     print("=" * 50)
-    print(f"Retirement age: {final_year['Age']}")
-    print(f"Salary: £{final_year['Salary']:,.0f}")
+    print(f"Final age: {final_row['Age']}")
+    print(f"Final salary: £{final_row['Salary']:,.0f}")
     print()
     print("Final pot values:")
-    print(f"  LISA:      £{final_year['LISA Balance']:,.0f}")
-    print(f"  ISA:       £{final_year['ISA Balance']:,.0f}")
-    print(f"  SIPP:      £{final_year['SIPP Balance']:,.0f}")
-    print(f"  Workplace: £{final_year['Workplace Balance']:,.0f}")
-    print(f"  TOTAL:     £{total_final_balance:,.0f}")
+    print(f"  LISA:      £{final_row['Pot LISA']:,.0f}")
+    print(f"  ISA:       £{final_row['Pot ISA']:,.0f}")
+    print(f"  SIPP:      £{final_row['Pot SIPP']:,.0f}")
+    print(f"  Workplace: £{final_row['Pot Workplace']:,.0f}")
+    print(f"  TOTAL:     £{total_final:,.0f}")
     print()
 
-    print(f"Total net contributions: £{net_contribution:,.0f}")
-    print(f"Total initial balance: £{total_initial_balance:,.0f}")
-    print(f"Total growth: £{growth:,.0f}")
-    multipler = max((portfilio_balance - total_initial_balance) / net_contribution, 1)
-    if multipler == float("inf"):
-        multipler = "inf"
-    elif multipler == float("nan"):
-        multipler = "NaN"
-    else:
-        multipler = f"{multipler:.2f}x"
-    print(f"Growth multiple: {multipler}")
+    total_contributions = df["Net Contribution Cost"].sum()
+    print(f"Total net contributions: £{total_contributions:,.0f}")
+    print(f"Total growth: £{total_final - total_contributions:,.0f}")
+    print(f"Growth multiple: {total_final / max(total_contributions, 1):.1f}x")
 
 
 def main() -> None:
+    """
+    Main CLI entry point for Planwise.
+
+    This function parses command‑line arguments, optionally merges values from a
+    JSON configuration file, constructs the necessary dataclasses, computes a
+    realistic take‑home salary based on UK income tax and National Insurance
+    rules, and runs the retirement projection.  Results can be written to a
+    CSV file, displayed in full or summarised.
+
+    Unlike earlier versions of the CLI, contributions are now interpreted as
+    fractions of *take‑home* salary rather than gross salary, mirroring the
+    behaviour of the Streamlit application.  The CLI automatically
+    calculates the employee's income tax and NI contributions based on the
+    selected tax year and region (Scottish or rest of UK).  This ensures
+    that contribution rates and allowance checks are applied consistently with
+    the interactive app.
+    """
     parser = create_parser()
     args = parser.parse_args()
 
+    # Optionally load config file and override args.  Keys in the JSON
+    # configuration should use the same long‑form names as CLI flags (without
+    # leading dashes).  Unknown keys are ignored.
     if args.config:
-        profile_settings = load_profile_from_json(args.config)
-    else:
-        profile_settings = convert_parser_arguments_to_profile(args)
+        config = load_config(args.config)
+        for key, value in config.items():
+            attr = key.replace("-", "_")
+            if hasattr(args, attr):
+                setattr(args, attr, value)
 
-    investment_dataframe = pw.project_investment(profile_settings)
-    retirement_dataframe = pw.project_retirement(profile_settings, investment_dataframe)
-
-    if args.output:
-        investment_dataframe.to_csv(f"investment_{args.output}", index=False)
-        retirement_dataframe.to_csv(f"retirement_{args.output}", index=False)
-        print(f"Results saved to investment_{args.output} and retirement_{args.output}")
-
-    if args.summary:
-        total_initial_balance = (
-            profile_settings.account_balances.isa_balance
-            + profile_settings.account_balances.lisa_balance
-            + profile_settings.account_balances.sipp_balance
-            + profile_settings.account_balances.workplace_pension_balance
+    # Compute income tax and NI to derive take‑home salary.  Both functions
+    # accept the tax year and region; NI defaults to category A.  Use a
+    # try/except so that any unexpected errors result in a friendly message.
+    try:
+        ni_due = calculate_ni(args.salary, year=args.tax_year, category="category_a")
+        income_tax = calculate_income_tax(
+            args.salary, scotland=args.scotland, year=args.tax_year
         )
-        print_summary(investment_dataframe, total_initial_balance)
+        take_home_salary = args.salary - ni_due - income_tax
+    except Exception as e:
+        print(f"Error computing tax or NI: {e}")
+        sys.exit(1)
 
+    # Prepare user, contribution, and return dataclasses
+    user = UserProfile(
+        current_age=args.current_age,
+        retirement_age=args.retirement_age,
+        salary=args.salary,
+        scotland=args.scotland,
+    )
+    contrib = ContributionRates(
+        lisa=args.lisa_rate,
+        isa=args.isa_rate,
+        sipp_employee=args.sipp_employee_rate,
+        sipp_employer=args.sipp_employer_rate,
+        workplace_employee=args.workplace_employee_rate,
+        workplace_employer=args.workplace_employer_rate,
+        shift_lisa_to_isa=args.shift_lisa_to_isa,
+        shift_lisa_to_sipp=args.shift_lisa_to_sipp,
+    )
+    returns = InvestmentReturns(
+        lisa=args.roi_lisa,
+        isa=args.roi_isa,
+        sipp=args.roi_sipp,
+        workplace=args.roi_workplace,
+    )
+
+    # Construct the IncomeBreakdown with actual tax and NI.  Import here to
+    # avoid circular imports at module load time.
+    from .core import IncomeBreakdown
+
+    income = IncomeBreakdown(
+        salary=args.salary,
+        take_home_salary=take_home_salary,
+        income_tax=income_tax,
+        ni_due=ni_due,
+    )
+
+    # Run the projection
+    try:
+        df = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=args.inflation,
+            use_qualifying_earnings=args.use_qualifying_earnings,
+            year=args.tax_year,
+        )
+    except Exception as e:
+        print(f"Error running projection: {e}")
+        sys.exit(1)
+
+    # Output results to CSV if requested
+    if args.output:
+        df.to_csv(args.output, index=False)
+        print(f"Results saved to {args.output}")
+
+    # Print summary if requested
+    if args.summary:
+        print_summary(df)
+
+    # Otherwise, print the full DataFrame
     if not args.output and not args.summary:
-        print(investment_dataframe.to_string(index=False))
+        print(df.to_string(index=False))
 
 
 if __name__ == "__main__":

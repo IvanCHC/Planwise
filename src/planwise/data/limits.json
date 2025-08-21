@@ -4,10 +4,6 @@
     "isa_limit": 20000.0,
     "pension_annual_allowance": 60000.0,
     "qualifying_lower": 6240.0,
-    "qualifying_upper": 50270.0,
-    "lump_sum_allowance": 268275.0,
-    "lisa_maximum_contribution_age": 50,
-    "lisa_withdrawal_age": 60,
-    "pension_withdrawal_age": 55
+    "qualifying_upper": 50270.0
   }
 }

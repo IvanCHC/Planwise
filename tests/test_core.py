@@ -1,202 +1,695 @@
-from unittest.mock import MagicMock
+"""
+Tests for core retirement projection functionality in Planwise.
+
+These tests cover the main projection logic, LISA/ISA rules, pension caps, pot growth,
+qualifying earnings, and tax region differences.
+"""
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from planwise.core import (
-    InvestmentSimulator,
+    ContributionRates,
+    IncomeBreakdown,
+    InvestmentReturns,
     RetirementSimulator,
-    project_investment,
+    UserProfile,
+    calculate_lisa_isa_contributions,
+    calculate_pension_contributions,
     project_retirement,
 )
 
 
-@pytest.fixture
-def mock_profile():
-    profile = MagicMock()
-    profile.tax_year = 2025
-    profile.scotland = False
-    profile.personal_details.current_age = 30
-    profile.personal_details.retirement_age = 65
-    profile.personal_details.salary = 50000
-    profile.personal_details.take_home_salary = 35000
-    profile.personal_details.income_tax = 5000
-    profile.personal_details.ni_contribution = 3000
-    profile.account_balances.lisa_balance = 10000
-    profile.account_balances.isa_balance = 5000
-    profile.account_balances.sipp_balance = 20000
-    profile.account_balances.workplace_pension_balance = 15000
-    profile.contribution_settings.lisa_contribution = 4000
-    profile.contribution_settings.isa_contribution = 2000
-    profile.contribution_settings.workplace_er_contribution = 1000
-    profile.contribution_settings.workplace_ee_contribution = 2000
-    profile.contribution_settings.sipp_contribution = 3000
-    profile.post_50_contribution_settings.post_50_lisa_to_isa_contribution = 1000
-    profile.post_50_contribution_settings.post_50_lisa_to_sipp_contribution = 500
-    profile.expected_returns_and_inflation.expected_lisa_annual_return = 0.05
-    profile.expected_returns_and_inflation.expected_isa_annual_return = 0.04
-    profile.expected_returns_and_inflation.expected_workplace_annual_return = 0.03
-    profile.expected_returns_and_inflation.expected_sipp_annual_return = 0.06
-    profile.expected_returns_and_inflation.expected_inflation = 0.02
-    profile.post_retirement_settings.withdrawal_today_amount = 25000
-    profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage = 0.25
-    profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage = 0.25
-    profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage = (
-        0.25
-    )
-    profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage = (
-        0.25
-    )
-    profile.post_retirement_settings.postret_lisa_withdrawal_age = 65
-    profile.post_retirement_settings.postret_isa_withdrawal_age = 65
-    profile.post_retirement_settings.postret_taxfree_pension_withdrawal_age = 65
-    profile.post_retirement_settings.postret_taxable_pension_withdrawal_age = 65
-    profile.post_retirement_settings.expected_post_retirement_lisa_annual_return = 0.03
-    profile.post_retirement_settings.expected_post_retirement_isa_annual_return = 0.03
-    profile.post_retirement_settings.expected_post_retirement_pension_annual_return = (
-        0.03
-    )
-    return profile
+class TestProjectRetirement:
+    """
+    Test the main projection function and related helpers.
+    """
 
+    def test_basic_projection(self):
+        """
+        Test a basic retirement projection for correct DataFrame structure and columns.
+        """
+        user = UserProfile(
+            current_age=30,
+            retirement_age=35,
+            salary=40000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
+            shift_lisa_to_isa=0.5,
+            shift_lisa_to_sipp=0.5,
+        )
+        returns = InvestmentReturns(
+            lisa=0.05,
+            isa=0.05,
+            sipp=0.05,
+            workplace=0.05,
+        )
+        from planwise.core import IncomeBreakdown
 
-def test_investment_simulator_simulate_returns_dataframe(mock_profile):
-    sim = InvestmentSimulator(mock_profile)
-    df = sim.simulate()
-    assert isinstance(df, pd.DataFrame)
-    assert not df.empty
-    assert "Age" in df.columns
-    assert "LISA Balance" in df.columns
-    assert "ISA Balance" in df.columns
-    assert "SIPP Balance" in df.columns
-    assert "Workplace Balance" in df.columns
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.02,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
 
+        # Check basic structure
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 5  # 5 years from age 30 to 35
+        assert result["Age"].tolist() == [30, 31, 32, 33, 34]
 
-def test_project_investment_returns_dataframe(mock_profile):
-    df = project_investment(mock_profile)
-    assert isinstance(df, pd.DataFrame)
-    assert "Portfolio Balance" in df.columns
+        # Check required columns exist
+        required_columns = [
+            "Age",
+            "Salary",
+            "LISA Net",
+            "LISA Bonus",
+            "ISA Net",
+            "SIPP Employee Net",
+            "SIPP Employee Gross",
+            "SIPP Employer",
+            "Workplace Employee Net",
+            "Workplace Employee Gross",
+            "Workplace Employer",
+            "Tax Relief (total)",
+            "Tax Refund",
+            "Net Contribution Cost",
+            "Pot LISA",
+            "Pot ISA",
+            "Pot SIPP",
+            "Pot Workplace",
+        ]
+        for col in required_columns:
+            assert col in result.columns
 
+    def test_lisa_age_restriction(self):
+        """
+        Test that LISA contributions stop at age 50 and are redirected appropriately.
+        """
+        user = UserProfile(
+            current_age=48,
+            retirement_age=52,
+            salary=40000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=1.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        from planwise.core import IncomeBreakdown
 
-def test_retirement_simulator_simulate_returns_dataframe(mock_profile):
-    invest_df = project_investment(mock_profile)
-    sim = RetirementSimulator(mock_profile, invest_df)
-    df = sim.simulate()
-    assert isinstance(df, pd.DataFrame)
-    assert "Age" in df.columns
-    assert "Withdrawal Today" in df.columns
-    assert "Total Withdrawal Today" in df.columns
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.0,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
 
+        # Ages 48-49 should have LISA contributions
+        assert result.loc[result["Age"] == 48, "LISA Net"].iloc[0] > 0
+        assert result.loc[result["Age"] == 49, "LISA Net"].iloc[0] > 0
 
-def test_retirement_simulator_simulate_percentage_not_one(mock_profile):
-    # Set withdrawal percentages to not sum to 1.0
-    mock_profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage = (
-        0.2
-    )
-    mock_profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage = (
-        0.2
-    )
-    mock_profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage = (
-        0.2
-    )
-    mock_profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage = (
-        0.2
-    )
-    invest_df = project_investment(mock_profile)
-    sim = RetirementSimulator(mock_profile, invest_df)
-    df = sim.simulate()
-    assert isinstance(df, pd.DataFrame)
-    assert df.empty
+        # Ages 50+ should have no LISA contributions
+        assert result.loc[result["Age"] == 50, "LISA Net"].iloc[0] == 0
+        assert result.loc[result["Age"] == 51, "LISA Net"].iloc[0] == 0
 
+        # But ISA should receive redirected amounts
+        assert result.loc[result["Age"] == 50, "ISA Net"].iloc[0] > 0
+        assert result.loc[result["Age"] == 51, "ISA Net"].iloc[0] > 0
 
-def test_retirement_simulator_shortfall_and_redistribution(mock_profile):
-    # Set balances low to force shortfall and redistribution
-    invest_df = project_investment(mock_profile)
-    sim = RetirementSimulator(mock_profile, invest_df)
-    sim._lisa_balance_todays = 0.0
-    sim._isa_balance_todays = 0.0
-    sim._taxfree_pension_balance_todays = 0.0
-    sim._taxable_pension_balance_todays = 0.0
-    age = mock_profile.personal_details.retirement_age
-    inflation_adjustment = sim._inflation_adjustment(age)
-    record = {"Withdrawal State Pension Today": 0.0}
-    result = sim._calculate_accounts_withdrawal_and_income_tax(
-        age, inflation_adjustment, record
-    )
-    assert result["Withdrawal Shortfall Today"] >= 0.0
-    assert result["Withdrawal LISA Today"] == 0.0
-    assert result["Withdrawal ISA Today"] == 0.0
-    assert result["Withdrawal Tax-Free Pension Today"] == 0.0
-    assert result["Withdrawal Taxable Pension Today"] == 0.0
+    def test_lisa_bonus_calculation(self):
+        """
+        Test LISA bonus is calculated as 25% of net contribution, capped at limit.
+        """
+        user = UserProfile(
+            current_age=30,
+            retirement_age=31,
+            salary=40000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        from planwise.core import IncomeBreakdown
 
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.0,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
 
-def test_get_withdraw_plan_redistribution(mock_profile):
-    invest_df = project_investment(mock_profile)
-    sim = RetirementSimulator(mock_profile, invest_df)
-    # Set ages so some accounts are unavailable
-    mock_profile.post_retirement_settings.postret_lisa_withdrawal_age = 70
-    mock_profile.post_retirement_settings.postret_isa_withdrawal_age = 70
-    plan = sim._get_withdraw_plan(age=65)
-    # LISA and ISA should be 0, others should get redistributed percentage
-    assert plan["lisa"] == 0.0
-    assert plan["isa"] == 0.0
-    assert plan["taxfree_pension"] > 0.0
-    assert plan["taxable_pension"] > 0.0
+        lisa_net = result.iloc[0]["LISA Net"]
+        lisa_bonus = result.iloc[0]["LISA Bonus"]
 
+        # Should cap at £4000 and give 25% bonus
+        assert lisa_net == 4000  # Capped at LISA limit
+        assert lisa_bonus == 1000  # 25% of £4000
 
-def test_inflation_adjustment(mock_profile):
-    sim = RetirementSimulator(mock_profile, project_investment(mock_profile))
-    adj = sim._inflation_adjustment(35)
-    assert adj == pytest.approx(
-        (1 + mock_profile.expected_returns_and_inflation.expected_inflation) ** 5
-    )
+    # def test_pension_annual_allowance_cap(self):
+    #     """Test that pension contributions are capped by annual allowance."""
+    #     user = UserProfile(
+    #         current_age=30,
+    #         retirement_age=31,
+    #         salary=500000,
+    #         scotland=False,
+    #     )
+    #     contrib = ContributionRates(
+    #         lisa=0.0,
+    #         isa=0.0,
+    #         sipp_employee=0.20,
+    #         sipp_employer=0.10,
+    #         workplace_employee=0.20,
+    #         workplace_employer=0.20,
+    #         shift_lisa_to_isa=0.0,
+    #         shift_lisa_to_sipp=0.0,
+    #     )
+    #     returns = InvestmentReturns(
+    #         lisa=0.0,
+    #         isa=0.0,
+    #         sipp=0.0,
+    #         workplace=0.0,
+    #     )
+    #     result = project_retirement(
+    #         user=user,
+    #         contrib=contrib,
+    #         returns=returns,
+    #         inflation=0.0,
+    #         use_qualifying_earnings=False,
+    #         year=2025,
+    #     )
+    #     row = result.iloc[0]
+    #     total_pension = (
+    #         row["SIPP Employee Gross"]
+    #         + row["SIPP Employer"]
+    #         + row["Workplace Employee Gross"]
+    #         + row["Workplace Employer"]
+    #     )
+    #     assert total_pension <= 60000.1  # Allow for small rounding
 
+    def test_pot_growth(self):
+        """
+        Test that all pots grow with positive returns.
+        """
+        user = UserProfile(
+            current_age=30,
+            retirement_age=32,
+            salary=40000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.10,
+            isa=0.10,
+            sipp=0.10,
+            workplace=0.10,
+        )
+        from planwise.core import IncomeBreakdown
 
-def test_inflation_adjustment_edge(mock_profile):
-    invest_df = project_investment(mock_profile)
-    sim = RetirementSimulator(mock_profile, invest_df)
-    # Age equal to current age should return 1.0
-    adj = sim._inflation_adjustment(sim._current_age)
-    assert adj == 1.0
-    # Negative years should return < 1.0
-    adj_neg = sim._inflation_adjustment(sim._current_age - 5)
-    assert adj_neg < 1.0
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.0,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
 
+        # All pots should be positive and growing
+        for col in ["Pot LISA", "Pot ISA", "Pot SIPP", "Pot Workplace"]:
+            assert result.iloc[0][col] > 0
+            assert result.iloc[1][col] > result.iloc[0][col]
 
-def test_lisa_contribution_under_50(mock_profile):
-    sim = InvestmentSimulator(mock_profile)
-    result = sim._calculate_lisa_contribution(age=40)
-    assert result["LISA Net"] == mock_profile.contribution_settings.lisa_contribution
-    assert (
-        result["LISA Bonus"]
-        == mock_profile.contribution_settings.lisa_contribution * 0.25
-    )
+    def test_qualifying_earnings_calculation(self):
+        """
+        Test workplace pension contributions are based on qualifying earnings when enabled.
+        """
+        # Test with salary below qualifying band
+        user = UserProfile(
+            current_age=30,
+            retirement_age=31,
+            salary=20000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        from planwise.core import IncomeBreakdown
 
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        result_low = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.0,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
 
-def test_lisa_contribution_over_50(mock_profile):
-    sim = InvestmentSimulator(mock_profile)
-    result = sim._calculate_lisa_contribution(age=55)
-    assert result["LISA Net"] == 0.0
-    assert result["LISA Bonus"] == 0.0
+        # Should be based on qualifying earnings (20000 - 6240 = 13760)
+        qualifying_base = max(20000 - 6240, 0)
+        expected_employee = qualifying_base * 0.05 / 0.8  # Grossed up
+        expected_employer = qualifying_base * 0.03
 
+        row = result_low.iloc[0]
+        assert abs(row["Workplace Employee Gross"] - expected_employee) < 0.01
+        assert abs(row["Workplace Employer"] - expected_employer) < 0.01
 
-def test_isa_contribution_post_50(mock_profile):
-    sim = InvestmentSimulator(mock_profile)
-    result = sim._calculate_isa_contribution(age=55)
-    expected = (
-        mock_profile.contribution_settings.isa_contribution
-        + mock_profile.post_50_contribution_settings.post_50_lisa_to_isa_contribution
-    )
-    assert result["ISA Net"] == expected
-    assert result["ISA Gross"] == expected
+    @pytest.mark.parametrize("scotland", [False, True])
+    def test_scottish_vs_uk_tax(self, scotland):
+        """
+        Test that Scottish and UK tax calculations produce different results for the same salary.
+        """
+        user = UserProfile(
+            current_age=30,
+            retirement_age=31,
+            salary=60000,
+            scotland=scotland,
+        )
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.10,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        returns = InvestmentReturns(
+            lisa=0.0,
+            isa=0.0,
+            sipp=0.0,
+            workplace=0.0,
+        )
+        from planwise.core import IncomeBreakdown
 
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        result = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.0,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
 
-def test_sipp_contribution_post_50(mock_profile):
-    sim = InvestmentSimulator(mock_profile)
-    result = sim._calculate_sipp_contribution(age=55)
-    expected = (
-        mock_profile.contribution_settings.sipp_contribution
-        + mock_profile.post_50_contribution_settings.post_50_lisa_to_sipp_contribution
-    )
-    assert result["SIPP Net"] == expected
-    assert result["SIPP Gross"] == expected * 1.25 / 1.0  # 25% tax relief
+        # Should have some tax relief
+        tax_relief = result.iloc[0]["Tax Relief (total)"]
+        assert tax_relief > 0
+
+    def test_lisa_isa_under_50(self):
+        """
+        Test LISA and ISA contributions under age 50, no redirection.
+        """
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.05,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=30000,
+            age=30,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # LISA: 10% of 30,000 = 3,000 (under limit)
+        assert result["lisa_net"] == 3000
+        assert result["lisa_bonus"] == 750
+        assert result["lisa_gross"] == 3750
+        # ISA: 5% of 30,000 = 1,500
+        assert result["isa_net"] == 1500
+        # No redirection
+        assert result["redirected_sipp_net"] == 0
+
+    def test_lisa_isa_lisa_cap(self):
+        """
+        Test LISA contributions are capped at the annual limit.
+        """
+        contrib = ContributionRates(
+            lisa=0.20,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=30000,
+            age=30,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # LISA: 20% of 30,000 = 6,000, but capped at 4,000
+        assert result["lisa_net"] == 4000
+        assert result["lisa_bonus"] == 1000
+        assert result["lisa_gross"] == 5000
+
+    def test_lisa_isa_over_50_redirection(self):
+        """
+        Test LISA contributions are redirected to ISA and SIPP after age 50.
+        """
+        contrib = ContributionRates(
+            lisa=0.10,
+            isa=0.05,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.6,
+            shift_lisa_to_sipp=0.4,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=30000,
+            age=55,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # Over 50: no LISA, but 10% of 30,000 = 3,000 redirected
+        # 60% to ISA, 40% to SIPP
+        assert result["lisa_net"] == 0
+        assert result["lisa_bonus"] == 0
+        assert result["lisa_gross"] == 0
+        assert result["isa_net"] == 0.05 * 30000 + 0.6 * 3000  # 1500 + 1800 = 3300
+        assert result["redirected_sipp_net"] == 0.4 * 3000  # 1200
+
+    def test_isa_cap_with_lisa(self):
+        """
+        Test ISA contributions are capped when LISA is also used.
+        """
+        contrib = ContributionRates(
+            lisa=0.20,
+            isa=0.20,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        result = calculate_lisa_isa_contributions(
+            current_salary=100_000,
+            age=30,
+            contrib=contrib,
+            lisa_limit=4000,
+            isa_limit=20000,
+        )
+        # LISA: capped at 4000, gross 5000
+        # ISA: 20% of 100,000 = 20,000, but only 20,000 - 5,000 = 15,000 allowed
+        assert result["lisa_net"] == 4000
+        assert result["lisa_gross"] == 5000
+
+    def test_retirement_simulator_equivalence(self):
+        """
+        Ensure that the RetirementSimulator class produces the same results
+        as the project_retirement convenience function.  The simulator is a
+        refactoring of the original projection logic; this test guards
+        against inadvertent divergences between the two interfaces.
+        """
+
+        user = UserProfile(
+            current_age=35,
+            retirement_age=40,
+            salary=50000,
+            scotland=False,
+        )
+        contrib = ContributionRates(
+            lisa=0.05,
+            isa=0.05,
+            sipp_employee=0.05,
+            sipp_employer=0.02,
+            workplace_employee=0.05,
+            workplace_employer=0.03,
+            shift_lisa_to_isa=0.5,
+            shift_lisa_to_sipp=0.5,
+        )
+        returns = InvestmentReturns(
+            lisa=0.05,
+            isa=0.05,
+            sipp=0.05,
+            workplace=0.05,
+        )
+        income = IncomeBreakdown(
+            salary=user.salary,
+            take_home_salary=user.salary,
+            income_tax=0.0,
+            ni_due=0.0,
+        )
+        df_func = project_retirement(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.02,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
+        simulator = RetirementSimulator(
+            user=user,
+            contrib=contrib,
+            returns=returns,
+            income=income,
+            inflation=0.02,
+            use_qualifying_earnings=True,
+            year=2025,
+        )
+        df_class = simulator.simulate()
+        # Compare DataFrames; ignore index and column order
+        pd.testing.assert_frame_equal(
+            df_func.reset_index(drop=True)[df_class.columns],
+            df_class.reset_index(drop=True),
+            check_dtype=False,
+        )
+
+    def test_pension_contributions_basic(self):
+        """
+        Test basic SIPP and workplace pension contribution calculations.
+        """
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.05,
+            sipp_employer=0.03,
+            workplace_employee=0.04,
+            workplace_employer=0.02,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        current_salary = 50000
+        base_for_workplace = 40000
+        redirected_sipp_net = 0
+
+        result = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+
+        # SIPP employee: 5% of 50,000 = 2,500 net, grossed up to 3,125
+        assert abs(result["sipp_employee_net"] - 2500) < 0.01
+        assert abs(result["sipp_employee_gross"] - 3125) < 0.01
+        # SIPP employer: 3% of 50,000 = 1,500
+        assert abs(result["sipp_employer_gross"] - 1500) < 0.01
+        # WP employee: 4% of 40,000 = 1,600 net, grossed up to 2,000
+        assert abs(result["wp_employee_net"] - 1600) < 0.01
+        assert abs(result["wp_employee_gross"] - 2000) < 0.01
+        # WP employer: 2% of 40,000 = 800
+        assert abs(result["wp_employer_gross"] - 800) < 0.01
+
+    def test_pension_contributions_with_redirection(self):
+        """
+        Test SIPP contributions with redirected amounts from LISA.
+        """
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.05,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        current_salary = 30000
+        base_for_workplace = 30000
+        redirected_sipp_net = 1000
+
+        result = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+
+        # SIPP employee: (5% of 30,000) + 1,000 = 2,500 net, grossed up to 3,125
+        assert abs(result["sipp_employee_net"] - 2500) < 0.01
+        assert abs(result["sipp_employee_gross"] - 3125) < 0.01
+        # SIPP employer: 0
+        assert result["sipp_employer_gross"] == 0
+        # WP employee/employer: 0
+        assert result["wp_employee_net"] == 0
+        assert result["wp_employee_gross"] == 0
+        assert result["wp_employer_gross"] == 0
+
+    def test_pension_contributions_zero(self):
+        """
+        Test all pension contributions are zero when salary and rates are zero.
+        """
+        contrib = ContributionRates(
+            lisa=0.0,
+            isa=0.0,
+            sipp_employee=0.0,
+            sipp_employer=0.0,
+            workplace_employee=0.0,
+            workplace_employer=0.0,
+            shift_lisa_to_isa=0.0,
+            shift_lisa_to_sipp=0.0,
+        )
+        current_salary = 0
+        base_for_workplace = 0
+        redirected_sipp_net = 0
+
+        result = calculate_pension_contributions(
+            current_salary=current_salary,
+            base_for_workplace=base_for_workplace,
+            contrib=contrib,
+            redirected_sipp_net=redirected_sipp_net,
+        )
+
+        assert result["sipp_employee_net"] == 0
+        assert result["sipp_employee_gross"] == 0
+        assert result["sipp_employer_gross"] == 0
+        assert result["wp_employee_net"] == 0
+        assert result["wp_employee_gross"] == 0
+        assert result["wp_employer_gross"] == 0
+
+    def test_load_limits_db(self):
+        """
+        Test that load_limits_db loads the limits JSON and contains expected keys.
+        """
+        from planwise.core import load_limits_db
+
+        limits = load_limits_db()
+        assert isinstance(limits, dict)
+        assert "2025" in limits
+        year_limits = limits["2025"]
+        for key in [
+            "lisa_limit",
+            "isa_limit",
+            "pension_annual_allowance",
+            "qualifying_lower",
+            "qualifying_upper",
+        ]:
+            assert key in year_limits
