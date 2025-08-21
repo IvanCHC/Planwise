@@ -385,7 +385,11 @@ def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
 
-    profile_settings = convert_parser_arguments_to_profile(args)
+    if args.config:
+        profile_settings = load_profile_from_json(args.config)
+    else:
+        profile_settings = convert_parser_arguments_to_profile(args)
+
     investment_dataframe = pw.project_investment(profile_settings)
     retirement_dataframe = pw.project_retirement(profile_settings, investment_dataframe)
 
