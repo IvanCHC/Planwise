@@ -1,16 +1,28 @@
 """
 Core retirement projection calculations for Planwise.
 
-This module contains the main projection function that models retirement
-savings across various UK tax wrappers over time. It provides dataclasses for user
-profile, contribution rates, and investment returns, as well as helper functions for
-calculating contributions and projecting account balances.
+This module provides the main simulation logic for projecting investment growth and retirement withdrawals.
+It includes two primary classes:
+
+- InvestmentSimulator: Simulates annual investment growth and contributions for various accounts
+                       (LISA, ISA, SIPP, Workplace Pension) up to retirement age.
+- RetirementSimulator: Simulates post-retirement annual withdrawals from accounts, state pension income,
+                       and tracks balances and shortfalls until a specified end age.
+
+Key functions:
+- project_investment(profile): Runs the investment simulation and returns a DataFrame of results.
+- project_retirement(profile, investment_dataframe): Runs the retirement withdrawal simulation and returns a DataFrame of results.
+
+Dependencies:
+- pandas for data manipulation
+- planwise.profile.ProfileSettings for user profile data
+- .databases and .tax for financial limits and tax calculations
+
 """
 
 from typing import Any
 
 import pandas as pd
-import streamlit as st
 
 from planwise.profile import ProfileSettings
 
@@ -308,11 +320,6 @@ class RetirementSimulator:
                 + self.profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage
             )
             if percentage != 1.0:
-                st.warning(
-                    f"Targeted withdrawal percentages do not sum to 100%. "
-                    f"Current sum is {percentage * 100:.2f}%. "
-                    f"Expected to be 100%."
-                )
                 return pd.DataFrame()
 
         simluation_years = self._simulation_end_age - self._retirement_age
@@ -430,10 +437,6 @@ class RetirementSimulator:
             withdrawal_taxfree_pension = self._taxfree_pension_balance_todays
             self._taxfree_pension_balance_todays = 0.0
             account_flags[2] = True
-        if withdrawal_taxfree_pension > 61000:
-            st.write(
-                f"Withdrawal from tax-free pension exceeds £61,000: {withdrawal_taxfree_pension}."
-            )
         if self._taxable_pension_balance_todays >= withdrawal_taxable_pension_tax:
             self._taxable_pension_balance_todays -= withdrawal_taxable_pension_tax
         else:

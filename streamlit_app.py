@@ -127,6 +127,19 @@ def main() -> None:
         retirement_dataframe = pw.project_retirement(
             profile_settings, investment_dataframe
         )
+        if profile_settings.post_retirement_settings.withdrawal_today_amount > 0:
+            percentage = (
+                profile_settings.post_retirement_settings.postret_isa_targeted_withdrawal_percentage
+                + profile_settings.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage
+                + profile_settings.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage
+                + profile_settings.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage
+            )
+            if percentage != 1.0:
+                st.warning(
+                    f"Targeted withdrawal percentages do not sum to 100%. "
+                    f"Current sum is {percentage * 100:.2f}%. "
+                    f"Expected to be 100%."
+                )
         if not retirement_dataframe.empty:
             render_post_retirement_analysis(profile_settings, retirement_dataframe)
             download_retirement_projection(
