@@ -36,3 +36,6 @@ docs:  ## Build documentation
 
 app:  ## Run the Streamlit app
 	streamlit run streamlit_app.py
+
+compile:  ## Compile the requirements
+	bash compile_requirements.sh
