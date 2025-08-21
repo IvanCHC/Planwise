@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -87,11 +88,79 @@ def test_retirement_simulator_simulate_returns_dataframe(mock_profile):
     assert "Total Withdrawal Today" in df.columns
 
 
-def test_project_retirement_returns_dataframe(mock_profile):
+def test_retirement_simulator_simulate_percentage_not_one(mock_profile):
+    # Set withdrawal percentages to not sum to 1.0
+    mock_profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage = (
+        0.2
+    )
+    mock_profile.post_retirement_settings.postret_lisa_targeted_withdrawal_percentage = (
+        0.2
+    )
+    mock_profile.post_retirement_settings.postret_taxfree_pension_targeted_withdrawal_percentage = (
+        0.2
+    )
+    mock_profile.post_retirement_settings.postret_taxable_pension_targeted_withdrawal_percentage = (
+        0.2
+    )
     invest_df = project_investment(mock_profile)
-    df = project_retirement(mock_profile, invest_df)
+    sim = RetirementSimulator(mock_profile, invest_df)
+    df = sim.simulate()
     assert isinstance(df, pd.DataFrame)
-    assert "Total Balance Today" in df.columns
+    assert df.empty
+
+
+def test_retirement_simulator_shortfall_and_redistribution(mock_profile):
+    # Set balances low to force shortfall and redistribution
+    invest_df = project_investment(mock_profile)
+    sim = RetirementSimulator(mock_profile, invest_df)
+    sim._lisa_balance_todays = 0.0
+    sim._isa_balance_todays = 0.0
+    sim._taxfree_pension_balance_todays = 0.0
+    sim._taxable_pension_balance_todays = 0.0
+    age = mock_profile.personal_details.retirement_age
+    inflation_adjustment = sim._inflation_adjustment(age)
+    record = {"Withdrawal State Pension Today": 0.0}
+    result = sim._calculate_accounts_withdrawal_and_income_tax(
+        age, inflation_adjustment, record
+    )
+    assert result["Withdrawal Shortfall Today"] >= 0.0
+    assert result["Withdrawal LISA Today"] == 0.0
+    assert result["Withdrawal ISA Today"] == 0.0
+    assert result["Withdrawal Tax-Free Pension Today"] == 0.0
+    assert result["Withdrawal Taxable Pension Today"] == 0.0
+
+
+def test_get_withdraw_plan_redistribution(mock_profile):
+    invest_df = project_investment(mock_profile)
+    sim = RetirementSimulator(mock_profile, invest_df)
+    # Set ages so some accounts are unavailable
+    mock_profile.post_retirement_settings.postret_lisa_withdrawal_age = 70
+    mock_profile.post_retirement_settings.postret_isa_withdrawal_age = 70
+    plan = sim._get_withdraw_plan(age=65)
+    # LISA and ISA should be 0, others should get redistributed percentage
+    assert plan["lisa"] == 0.0
+    assert plan["isa"] == 0.0
+    assert plan["taxfree_pension"] > 0.0
+    assert plan["taxable_pension"] > 0.0
+
+
+def test_inflation_adjustment(mock_profile):
+    sim = RetirementSimulator(mock_profile, project_investment(mock_profile))
+    adj = sim._inflation_adjustment(35)
+    assert adj == pytest.approx(
+        (1 + mock_profile.expected_returns_and_inflation.expected_inflation) ** 5
+    )
+
+
+def test_inflation_adjustment_edge(mock_profile):
+    invest_df = project_investment(mock_profile)
+    sim = RetirementSimulator(mock_profile, invest_df)
+    # Age equal to current age should return 1.0
+    adj = sim._inflation_adjustment(sim._current_age)
+    assert adj == 1.0
+    # Negative years should return < 1.0
+    adj_neg = sim._inflation_adjustment(sim._current_age - 5)
+    assert adj_neg < 1.0
 
 
 def test_lisa_contribution_under_50(mock_profile):
@@ -131,11 +200,3 @@ def test_sipp_contribution_post_50(mock_profile):
     )
     assert result["SIPP Net"] == expected
     assert result["SIPP Gross"] == expected * 1.25 / 1.0  # 25% tax relief
-
-
-def test_inflation_adjustment(mock_profile):
-    sim = RetirementSimulator(mock_profile, project_investment(mock_profile))
-    adj = sim._inflation_adjustment(35)
-    assert adj == pytest.approx(
-        (1 + mock_profile.expected_returns_and_inflation.expected_inflation) ** 5
-    )
