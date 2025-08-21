@@ -45,7 +45,7 @@ def _logo_section() -> None:
     with col2:
         st.markdown(
             "[<div style='text-align: center;'>:coffee: Buy me a Coffee</div>]"
-            "(https://planwise.readthedocs.io/en/latest/)",
+            "(https://buymeacoffee.com/ivanchc)",
             unsafe_allow_html=True,
         )
 
