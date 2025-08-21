@@ -26,6 +26,7 @@ contributions.
 """
 
 import os
+from io import BytesIO
 
 import pandas as pd
 import streamlit as st
@@ -42,12 +43,29 @@ def download_investment_projection(
 ) -> None:
     st.subheader("Export Data")
     csv = df.to_csv(index=False)
-    st.download_button(
-        label="Download projection as CSV",
-        data=csv,
-        file_name=f"investment_projection_{current_age}_to_{retirement_age}.csv",
-        mime="text/csv",
-    )
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Projection")
+    excel_bytes = buf.getvalue()  # raw XLSX bytes
+
+    st.write("Investment projection:")
+    col1, col2, _, _ = st.columns([1, 1, 4, 4])
+    with col1:
+        st.download_button(
+            label="as CSV",
+            data=csv,
+            file_name=f"investment_projection_{current_age}_to_{retirement_age}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with col2:
+        st.download_button(
+            label="as Excel",
+            data=excel_bytes,
+            file_name=f"investment_projection_{current_age}_to_{retirement_age}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
 
 
 def main() -> None:
