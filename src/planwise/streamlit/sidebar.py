@@ -537,7 +537,7 @@ def _account_balances_section() -> "AccountBalances":
             step=1000.0,
             key="sipp_balance",
         )
-        workpace_pension_balance = st.number_input(
+        workplace_pension_balance = st.number_input(
             "Workplace Pension Balance (£)",
             min_value=0.0,
             value=0.0,
@@ -548,7 +548,7 @@ def _account_balances_section() -> "AccountBalances":
         lisa_balance=lisa_balance,
         isa_balance=isa_balance,
         sipp_balance=sipp_balance,
-        workplace_pension_balance=workpace_pension_balance,
+        workplace_pension_balance=workplace_pension_balance,
     )
 
 
