@@ -1,28 +1,15 @@
 """
-Streamlit web application for UK Investment & Retirement Planning.
+Streamlit application for UK investment and retirement planning.
 
-This app provides an interactive interface to the planwise library,
-allowing users to model their retirement savings across various UK tax wrappers.
+This app provides an interactive interface to the planwise library, enabling users to model the growth of their retirement savings across key UK tax wrappers (LISA, ISA, SIPP, workplace pension). Users can input personal details, tax settings, contribution rates, and expected returns to generate projections and visualizations.
 
-This module defines a Streamlit application that models UK investment and
-retirement planning. The original implementation packed most of the UI logic
-into a single function. To improve readability and maintainability, the
-application has been refactored into smaller helper functions, each
-responsible for a logical section of the user interface. Detailed comments
-explain the purpose of each section and important calculations.
+Features:
+- Sidebar for collecting user inputs and assumptions
+- Pre- and post-retirement analysis with summary metrics, charts, and tables
+- Downloadable investment and retirement projections (CSV/Excel)
+- Modular UI for maintainability and clarity
 
-The high-level flow is:
-
-1. The sidebar collects user inputs: personal details, tax settings,
-   contribution rates, post-50 LISA redirection, and expected returns.
-2. These values are combined to instantiate planwise objects that model
-   retirement growth.
-3. The main area displays summary metrics, a breakdown of final pot values,
-   a detailed data table, charts and a download button.
-
-Keep in mind that this model is a simplification. It does not account for
-carry forward of unused allowances and assumes relief at source for pension
-contributions.
+Note: This model is a simplification and does not account for carry forward of unused allowances or all pension tax relief scenarios. For personalised advice, consult a financial adviser.
 """
 
 import os
