@@ -373,6 +373,71 @@ def get_sipp_contribution_rate(
     return rate, contribution
 
 
+def get_contribution_settings(
+    qualifying_earnings: "QualifyingEarnings",
+    personal_details: "PersonalDetails",
+    use_exact_amount: bool,
+    workplace_employer_contribution: float,
+    workplace_employee_contribution: float,
+    lisa_contribution: float,
+    isa_contribution: float,
+    sipp_contribution: float,
+) -> "ContributionSettings":
+    workplace_er_rate, workplace_er_contribution = get_workplace_contribution_rate(
+        workplace_employer_contribution,
+        personal_details,
+        qualifying_earnings,
+        use_exact_amount,
+    )
+    workplace_ee_rate, workplace_ee_contribution = get_workplace_contribution_rate(
+        workplace_employee_contribution,
+        personal_details,
+        qualifying_earnings,
+        use_exact_amount,
+    )
+    lisa_rate, lisa_contribution = get_isa_contribution_rate(
+        lisa_contribution, personal_details, use_exact_amount
+    )
+    isa_rate, isa_contribution = get_isa_contribution_rate(
+        isa_contribution, personal_details, use_exact_amount
+    )
+    sipp_rate, sipp_contribution = get_sipp_contribution_rate(
+        sipp_contribution, personal_details, use_exact_amount
+    )
+
+    total_net_contribution = (
+        workplace_ee_contribution
+        + lisa_contribution
+        + isa_contribution
+        + sipp_contribution
+    )
+    total_sipp_contribution = sipp_contribution * 1.25
+    total_workplace_contribution = (
+        workplace_er_contribution + workplace_ee_contribution * 1.25
+    )
+    total_pension_contribution = total_workplace_contribution + total_sipp_contribution
+    total_isa_contribution = lisa_contribution * 1.25 + isa_contribution
+    contribution_settings = ContributionSettings(
+        workplace_er_rate=workplace_er_rate,
+        workplace_er_contribution=workplace_er_contribution,
+        workplace_ee_rate=workplace_ee_rate,
+        workplace_ee_contribution=workplace_ee_contribution,
+        lisa_rate=lisa_rate,
+        lisa_contribution=lisa_contribution,
+        isa_rate=isa_rate,
+        isa_contribution=isa_contribution,
+        sipp_rate=sipp_rate,
+        sipp_contribution=sipp_contribution,
+        total_net_contribution=total_net_contribution,
+        total_workplace_contribution=total_workplace_contribution,
+        total_sipp_contribution=total_sipp_contribution,
+        total_isa_contribution=total_isa_contribution,
+        total_pension_contribution=total_pension_contribution,
+    )
+
+    return contribution_settings
+
+
 @dataclass
 class ContributionSettings:
     """

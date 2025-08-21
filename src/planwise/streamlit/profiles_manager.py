@@ -2,17 +2,14 @@ import streamlit as st
 
 from planwise.profile import (
     AccountBalances,
-    ContributionSettings,
     ExpectedReturnsAndInflation,
     PostRetirementSettings,
     ProfileSettings,
     delete_profile,
-    get_isa_contribution_rate,
+    get_contribution_settings,
     get_personal_details,
     get_post_50_contribution_settings,
     get_qualifying_earnings_info,
-    get_sipp_contribution_rate,
-    get_workplace_contribution_rate,
     list_profiles,
     load_profile,
     save_profile,
@@ -75,59 +72,18 @@ def convert_streamlit_state_to_profile() -> "ProfileSettings":
     workplace_employee_contribution = st.session_state.get(
         "workplace_employee_contribution", 0.05
     )
-    workplace_er_rate, workplace_er_contribution = get_workplace_contribution_rate(
-        workplace_employer_contribution,
-        personal_details,
-        qualifying_earnings,
-        use_exact_amount,
-    )
-    workplace_ee_rate, workplace_ee_contribution = get_workplace_contribution_rate(
-        workplace_employee_contribution,
-        personal_details,
-        qualifying_earnings,
-        use_exact_amount,
-    )
     lisa_contribution = st.session_state.get("lisa_contribution", 0.0)
     isa_contribution = st.session_state.get("isa_contribution", 0.0)
     sipp_contribution = st.session_state.get("sipp_contribution", 0.0)
-    lisa_rate, lisa_contribution = get_isa_contribution_rate(
-        lisa_contribution, personal_details, use_exact_amount
-    )
-    isa_rate, isa_contribution = get_isa_contribution_rate(
-        isa_contribution, personal_details, use_exact_amount
-    )
-    sipp_rate, sipp_contribution = get_sipp_contribution_rate(
-        sipp_contribution, personal_details, use_exact_amount
-    )
-
-    total_net_contribution = (
-        workplace_ee_contribution
-        + lisa_contribution
-        + isa_contribution
-        + sipp_contribution
-    )
-    total_sipp_contribution = sipp_contribution * 1.25
-    total_workplace_contribution = (
-        workplace_er_contribution + workplace_ee_contribution * 1.25
-    )
-    total_pension_contribution = total_workplace_contribution + total_sipp_contribution
-    total_isa_contribution = lisa_contribution * 1.25 + isa_contribution
-    contribution_settings = ContributionSettings(
-        workplace_er_rate=workplace_er_rate,
-        workplace_er_contribution=workplace_er_contribution,
-        workplace_ee_rate=workplace_ee_rate,
-        workplace_ee_contribution=workplace_ee_contribution,
-        lisa_rate=lisa_rate,
-        lisa_contribution=lisa_contribution,
-        isa_rate=isa_rate,
-        isa_contribution=isa_contribution,
-        sipp_rate=sipp_rate,
-        sipp_contribution=sipp_contribution,
-        total_net_contribution=total_net_contribution,
-        total_workplace_contribution=total_workplace_contribution,
-        total_sipp_contribution=total_sipp_contribution,
-        total_isa_contribution=total_isa_contribution,
-        total_pension_contribution=total_pension_contribution,
+    contribution_settings = get_contribution_settings(
+        qualifying_earnings,
+        personal_details,
+        use_exact_amount,
+        workplace_employer_contribution,
+        workplace_employee_contribution,
+        lisa_contribution,
+        isa_contribution,
+        sipp_contribution,
     )
 
     lisa_balance = st.session_state.get("lisa_balance", 0.0)
@@ -145,6 +101,7 @@ def convert_streamlit_state_to_profile() -> "ProfileSettings":
     redirectable_to_isa_contribution = st.session_state.get(
         "redirectable_to_isa_contribution", 0.0
     )
+    lisa_contribution = contribution_settings.lisa_contribution
     post_50_contribution_settings = get_post_50_contribution_settings(
         use_exact_amount_post50=use_exact_amount_post50,
         redirectable_to_isa_contribution=redirectable_to_isa_contribution,
@@ -375,14 +332,20 @@ def render_profiles_manager() -> None:
                 st.button(
                     "Save",
                     use_container_width=True,
-                    disabled=(st.session_state["selected_profile"] == "—"),
+                    disabled=(
+                        st.session_state["selected_profile"] == "—"
+                        and st.session_state["profile_name"] == "-"
+                    ),
                     on_click=_save_profile,
                 )
             with c2:
                 st.button(
                     "Reset",
                     use_container_width=True,
-                    disabled=(st.session_state["selected_profile"] == "—"),
+                    disabled=(
+                        st.session_state["selected_profile"] == "—"
+                        and st.session_state["profile_name"] == "-"
+                    ),
                     on_click=_load_profile,
                 )
             with c3:
