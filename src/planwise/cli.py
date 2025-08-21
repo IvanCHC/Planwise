@@ -2,6 +2,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 import planwise as pw
 from planwise.profile import (
     AccountBalances,
@@ -340,6 +342,45 @@ def convert_parser_arguments_to_profile(
     )
 
 
+def print_summary(dataframe: pd.DataFrame, total_initial_balance: float) -> None:
+    total_final_balance = (
+        dataframe["LISA Balance"].iloc[-1]
+        + dataframe["ISA Balance"].iloc[-1]
+        + dataframe["SIPP Balance"].iloc[-1]
+        + dataframe["Workplace Balance"].iloc[-1]
+    )
+    final_year = dataframe.iloc[-1]
+    portfilio_balance = final_year["Portfolio Balance"]
+    net_contribution = final_year["Portfolio Net Contribution"]
+    growth = portfilio_balance - net_contribution - total_initial_balance
+
+    print("\n" + "=" * 50)
+    print("RETIREMENT PROJECTION SUMMARY")
+    print("=" * 50)
+    print(f"Retirement age: {final_year['Age']}")
+    print(f"Salary: £{final_year['Salary']:,.0f}")
+    print()
+    print("Final pot values:")
+    print(f"  LISA:      £{final_year['LISA Balance']:,.0f}")
+    print(f"  ISA:       £{final_year['ISA Balance']:,.0f}")
+    print(f"  SIPP:      £{final_year['SIPP Balance']:,.0f}")
+    print(f"  Workplace: £{final_year['Workplace Balance']:,.0f}")
+    print(f"  TOTAL:     £{total_final_balance:,.0f}")
+    print()
+
+    print(f"Total net contributions: £{net_contribution:,.0f}")
+    print(f"Total initial balance: £{total_initial_balance:,.0f}")
+    print(f"Total growth: £{growth:,.0f}")
+    multipler = max((portfilio_balance - total_initial_balance) / net_contribution, 1)
+    if multipler == float("inf"):
+        multipler = "inf"
+    elif multipler == float("nan"):
+        multipler = "NaN"
+    else:
+        multipler = f"{multipler:.2f}x"
+    print(f"Growth multiple: {multipler}")
+
+
 def main() -> None:
     parser = create_parser()
     args = parser.parse_args()
@@ -347,6 +388,23 @@ def main() -> None:
     profile_settings = convert_parser_arguments_to_profile(args)
     investment_dataframe = pw.project_investment(profile_settings)
     retirement_dataframe = pw.project_retirement(profile_settings, investment_dataframe)
+
+    if args.output:
+        investment_dataframe.to_csv(f"investment_{args.output}", index=False)
+        retirement_dataframe.to_csv(f"retirement_{args.output}", index=False)
+        print(f"Results saved to investment_{args.output} and retirement_{args.output}")
+
+    if args.summary:
+        total_initial_balance = (
+            profile_settings.account_balances.isa_balance
+            + profile_settings.account_balances.lisa_balance
+            + profile_settings.account_balances.sipp_balance
+            + profile_settings.account_balances.workplace_pension_balance
+        )
+        print_summary(investment_dataframe, total_initial_balance)
+
+    if not args.output and not args.summary:
+        print(investment_dataframe.to_string(index=False))
 
 
 if __name__ == "__main__":
