@@ -897,7 +897,8 @@ def sidebar_inputs() -> "ProfileSettings":
     )
     st.session_state["profile_settings"] = profile_settings
 
-    st.sidebar.divider()
-    render_profiles_manager()
+    if os.environ.get("PROFILE_MANAGER_DISABLE", "false").lower() == "false":
+        st.sidebar.divider()
+        render_profiles_manager()
 
     return profile_settings
