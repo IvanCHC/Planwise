@@ -1,8 +1,12 @@
 """
 Tax calculations for UK income tax and pension relief in Planwise.
 
-This module loads tax band data and provides functions to compute income tax for both
-Scottish and rest-of-UK tax bands, including the calculation of tax relief on pension contributions.
+This module loads tax band data and provides functions to compute income tax for both Scottish and rest-of-UK tax bands, including the calculation of tax relief on pension contributions and gross income required for a target take-home amount.
+
+Functions:
+- _get_tax_bands: Returns tax bands and personal allowance for a region and year.
+- calculate_income_tax: Computes income tax payable on taxable income.
+- calculate_gross_from_take_home: Calculates gross income required for a target take-home amount.
 """
 
 from typing import Tuple
@@ -13,6 +17,7 @@ from .databases import TAX_BANDS_DB
 def _get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[list, float]:
     """
     Return income tax bands and personal allowance for the selected region and year.
+
     Args:
         scotland (bool): True for Scottish tax bands; False for rest of UK.
         year (int): Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
@@ -32,6 +37,7 @@ def _get_tax_bands(scotland: bool, year: int = 2025) -> Tuple[list, float]:
 def calculate_income_tax(income: float, scotland: bool, year: int = 2025) -> float:
     """
     Compute income tax payable on taxable income.
+
     Args:
         income (float): Taxable income (after personal allowance and before relief adjustments).
         scotland (bool): Use Scottish tax bands if True.
@@ -40,7 +46,6 @@ def calculate_income_tax(income: float, scotland: bool, year: int = 2025) -> flo
         float: Tax payable in pounds.
     """
     bands, personal_allowance = _get_tax_bands(scotland, year)
-    # Remove personal allowance from income
     taxable = max(income - personal_allowance, 0)
     tax_due = 0.0
     previous_threshold = personal_allowance
@@ -72,7 +77,6 @@ def calculate_gross_from_take_home(
         scotland (bool): Use Scottish tax bands if True.
         year (int): Tax year (e.g., 2025 for 2025/26). Defaults to 2025.
         state_pension (float): Annual state pension amount to reduce personal allowance.
-
     Returns:
         float: Gross income required to achieve the take-home amount.
     """

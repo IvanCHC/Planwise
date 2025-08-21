@@ -1,8 +1,11 @@
 """
 National Insurance (NI) calculations for UK employees.
 
-This module loads NI band data and provides functions to compute employee NI contributions
-for a given year and category.
+This module provides functions to retrieve NI bands and calculate employee National Insurance contributions for a given tax year and category.
+
+Functions:
+- _get_ni_bands(year, category): Returns NI bands for a given year and category.
+- calculate_ni(income, year, category): Calculates NI contributions for a given income, year, and category.
 """
 
 from typing import Any
@@ -13,6 +16,7 @@ from .databases import NI_BANDS_DB
 def _get_ni_bands(year: int = 2025, category: str = "category_a") -> Any:
     """
     Return the National Insurance bands for the given year and category.
+
     Args:
         year (int): Tax year.
         category (str): NI category (e.g., 'category_a').

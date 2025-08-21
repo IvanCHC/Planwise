@@ -4,10 +4,8 @@ Core retirement projection calculations for Planwise.
 This module provides the main simulation logic for projecting investment growth and retirement withdrawals.
 It includes two primary classes:
 
-- InvestmentSimulator: Simulates annual investment growth and contributions for various accounts
-                       (LISA, ISA, SIPP, Workplace Pension) up to retirement age.
-- RetirementSimulator: Simulates post-retirement annual withdrawals from accounts, state pension income,
-                       and tracks balances and shortfalls until a specified end age.
+- InvestmentSimulator: Simulates annual investment growth and contributions for various accounts (LISA, ISA, SIPP, Workplace Pension) up to retirement age.
+- RetirementSimulator: Simulates post-retirement annual withdrawals from accounts, state pension income, and tracks balances and shortfalls until a specified end age.
 
 Key functions:
 - project_investment(profile): Runs the investment simulation and returns a DataFrame of results.
@@ -17,7 +15,6 @@ Dependencies:
 - pandas for data manipulation
 - planwise.profile.ProfileSettings for user profile data
 - .databases and .tax for financial limits and tax calculations
-
 """
 
 from typing import Any
@@ -31,7 +28,20 @@ from .tax import calculate_gross_from_take_home, calculate_income_tax
 
 
 class InvestmentSimulator:
+    """
+    Simulates annual investment growth and contributions for LISA, ISA, SIPP, and Workplace Pension accounts up to retirement age.
+
+    Args:
+        profile (ProfileSettings): User profile settings containing financial and personal details.
+    """
+
     def __init__(self, profile: "ProfileSettings") -> None:
+        """
+        Initialize the InvestmentSimulator with user profile data.
+
+        Args:
+            profile (ProfileSettings): User profile settings.
+        """
         self.profile = profile
         self.tax_year = profile.tax_year
 
@@ -58,6 +68,12 @@ class InvestmentSimulator:
         self._sipp_gross_contribution = 0.0
 
     def simulate(self) -> pd.DataFrame:
+        """
+        Run the investment simulation for each year until retirement age.
+
+        Returns:
+            pd.DataFrame: Annual investment records including balances and contributions.
+        """
         simulation_years = self._retirement_age - self._current_age
         records: list[dict[str, Any]] = []
         for i in range(simulation_years):
@@ -81,6 +97,14 @@ class InvestmentSimulator:
         return pd.DataFrame(records)
 
     def _calculate_lisa_contribution(self, age: int) -> dict[str, float]:
+        """
+        Calculate LISA contribution and government bonus for a given age.
+
+        Args:
+            age (int): Current age in simulation.
+        Returns:
+            dict[str, float]: Net, bonus, and gross LISA contributions.
+        """
         lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
             "lisa_maximum_contribution_age", 50
         )
@@ -98,6 +122,14 @@ class InvestmentSimulator:
         }
 
     def _calculate_isa_contribution(self, age: int) -> dict[str, float]:
+        """
+        Calculate ISA contribution, including post-50 LISA-to-ISA transfer if applicable.
+
+        Args:
+            age (int): Current age in simulation.
+        Returns:
+            dict[str, float]: Net and gross ISA contributions.
+        """
         isa_contribution = self.profile.contribution_settings.isa_contribution
         lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
             "lisa_maximum_contribution_age", 50
@@ -110,6 +142,12 @@ class InvestmentSimulator:
         return {"ISA Net": isa_contribution, "ISA Gross": isa_contribution}
 
     def _calculate_workplace_contribution(self) -> dict[str, float]:
+        """
+        Calculate workplace pension contributions and tax relief.
+
+        Returns:
+            dict[str, float]: Employer, employee net/gross, and tax relief amounts.
+        """
         workplace_er_contribution = (
             self.profile.contribution_settings.workplace_er_contribution
         )
@@ -127,6 +165,14 @@ class InvestmentSimulator:
         }
 
     def _calculate_sipp_contribution(self, age: int) -> dict[str, float]:
+        """
+        Calculate SIPP contribution, including post-50 LISA-to-SIPP transfer if applicable.
+
+        Args:
+            age (int): Current age in simulation.
+        Returns:
+            dict[str, float]: Net, gross, and tax relief SIPP contributions.
+        """
         sipp_contribution = self.profile.contribution_settings.sipp_contribution
         lisa_maximum_contribution_age = LIMITS_DB[str(self.tax_year)].get(
             "lisa_maximum_contribution_age", 50
@@ -146,6 +192,14 @@ class InvestmentSimulator:
     def _calculate_tax_relief_and_refund(
         self, record: dict[str, float]
     ) -> dict[str, float]:
+        """
+        Calculate total tax relief and refund based on pension contributions.
+
+        Args:
+            record (dict[str, float]): Current year's contribution record.
+        Returns:
+            dict[str, float]: Tax relief and refund amounts.
+        """
         tax_relief = record.get("Workplace Tax Relief", 0.0) + record.get(
             "SIPP Tax Relief", 0.0
         )
@@ -168,6 +222,14 @@ class InvestmentSimulator:
         }
 
     def _aggregate_returns(self, record: dict[str, Any]) -> dict[str, float]:
+        """
+        Update account balances and aggregate contributions and returns for the year.
+
+        Args:
+            record (dict[str, Any]): Current year's contribution record.
+        Returns:
+            dict[str, float]: Updated balances and contribution totals.
+        """
         self._lisa_balance += record.get("LISA Gross", 0.0)
         self._lisa_balance *= (
             1 + self.profile.expected_returns_and_inflation.expected_lisa_annual_return
@@ -255,9 +317,24 @@ class InvestmentSimulator:
 
 
 class RetirementSimulator:
+    """
+    Simulates post-retirement annual withdrawals, state pension income, and tracks account balances and shortfalls until a specified end age.
+
+    Args:
+        profile (ProfileSettings): User profile settings.
+        investment_dataframe (pd.DataFrame): DataFrame of pre-retirement investment results.
+    """
+
     def __init__(
         self, profile: "ProfileSettings", investment_dataframe: pd.DataFrame
     ) -> None:
+        """
+        Initialize the RetirementSimulator with user profile and investment data.
+
+        Args:
+            profile (ProfileSettings): User profile settings.
+            investment_dataframe (pd.DataFrame): Investment simulation results.
+        """
         self.profile = profile
         self.investment_dataframe = investment_dataframe
         self.tax_year = profile.tax_year
@@ -312,6 +389,12 @@ class RetirementSimulator:
         ]
 
     def simulate(self) -> pd.DataFrame:
+        """
+        Run the retirement simulation for each year until simulation end age.
+
+        Returns:
+            pd.DataFrame: Annual withdrawal, tax, and balance records.
+        """
         if self._annual_withdrawal > 0:
             percentage = (
                 self.profile.post_retirement_settings.postret_isa_targeted_withdrawal_percentage
@@ -345,6 +428,14 @@ class RetirementSimulator:
     def _calculate_withdrawal_amount(
         self, inflation_adjustment: float
     ) -> dict[str, float]:
+        """
+        Calculate annual withdrawal amount in today's and inflation-adjusted terms.
+
+        Args:
+            inflation_adjustment (float): Inflation multiplier for the year.
+        Returns:
+            dict[str, float]: Withdrawal amounts.
+        """
         return {
             "Withdrawal Today": self._annual_withdrawal,
             "Withdrawal Inflation Adjusted": self._annual_withdrawal
@@ -354,6 +445,15 @@ class RetirementSimulator:
     def _calculate_state_pension(
         self, age: int, inflation_adjustment: float
     ) -> dict[str, float]:
+        """
+        Calculate state pension withdrawal for the year.
+
+        Args:
+            age (int): Current age in simulation.
+            inflation_adjustment (float): Inflation multiplier for the year.
+        Returns:
+            dict[str, float]: State pension withdrawal amounts.
+        """
         if age >= self._state_pension_age:
             sp_infl_adj = self._state_pension_amount * inflation_adjustment
             sp_todays = self._state_pension_amount
@@ -368,6 +468,16 @@ class RetirementSimulator:
     def _calculate_accounts_withdrawal_and_income_tax(
         self, age: int, inflation_adjustment: float, record: dict[str, float]
     ) -> dict[str, float]:
+        """
+        Calculate withdrawals from each account, income tax, and update balances for the year.
+
+        Args:
+            age (int): Current age in simulation.
+            inflation_adjustment (float): Inflation multiplier for the year.
+            record (dict[str, float]): Current year's withdrawal record.
+        Returns:
+            dict[str, float]: Withdrawals, taxes, balances, and shortfall.
+        """
         targeted_amount = self._annual_withdrawal
         withdraw_plan = self._get_withdraw_plan(age)
         state_pension = record.get("Withdrawal State Pension Today", 0.0)
@@ -597,6 +707,14 @@ class RetirementSimulator:
         }
 
     def _get_withdraw_plan(self, age: int) -> dict[str, float]:
+        """
+        Determine withdrawal plan percentages for each account based on age and user settings.
+
+        Args:
+            age (int): Current age in simulation.
+        Returns:
+            dict[str, float]: Withdrawal percentages for each account.
+        """
         retirement_settings = {
             "lisa": {
                 "age": self.profile.post_retirement_settings.postret_lisa_withdrawal_age,
@@ -651,11 +769,27 @@ class RetirementSimulator:
         return plan
 
     def _inflation_adjustment(self, age: int) -> float:
+        """
+        Calculate inflation adjustment multiplier for a given age.
+
+        Args:
+            age (int): Current age in simulation.
+        Returns:
+            float: Inflation multiplier.
+        """
         years = age - self._current_age
         return (1 + self._inflation) ** years
 
 
 def project_investment(profile: "ProfileSettings") -> pd.DataFrame:
+    """
+    Run the investment simulation for the given user profile.
+
+    Args:
+        profile (ProfileSettings): User profile settings.
+    Returns:
+        pd.DataFrame: Investment simulation results.
+    """
     simulator = InvestmentSimulator(profile)
     return simulator.simulate()
 
@@ -663,5 +797,14 @@ def project_investment(profile: "ProfileSettings") -> pd.DataFrame:
 def project_retirement(
     profile: "ProfileSettings", investment_dataframe: pd.DataFrame
 ) -> pd.DataFrame:
+    """
+    Run the retirement simulation for the given user profile and investment results.
+
+    Args:
+        profile (ProfileSettings): User profile settings.
+        investment_dataframe (pd.DataFrame): Investment simulation results.
+    Returns:
+        pd.DataFrame: Retirement simulation results.
+    """
     simulator = RetirementSimulator(profile, investment_dataframe)
     return simulator.simulate()

@@ -1,19 +1,16 @@
 """
-Plotting utilities for Planwise
-===============================
+Plotting utilities for Planwise retirement and investment projections.
 
-This module contains a set of classes and helper functions for visualising the
-results produced by the Planwise retirement projection engine.  The previous
-version of this module exposed a handful of standalone functions such as
-``make_contribution_plot`` and ``make_growth_plot``.  While those functions
-remain available as thin wrappers for backwards compatibility, the preferred
-interface is now the :class:`RetirementPlotter` class which encapsulates the
-preparation of data and construction of Altair charts.
+This module provides functions to generate Altair charts for visualizing investment breakdowns, annual contributions, growth projections, withdrawals, and balances by account over time.
 
-The refactoring into a class makes it easier to customise the plotting logic
-and reuse common transformations.  In addition to the Altair-based plots used
-pre-retirement, the module still provides a number of Plotly functions for
-visualising post-retirement withdrawals and account balances.
+Functions:
+- plot_pie_chart_breakdown: Pie chart for portfolio/account breakdown.
+- plot_annual_contribution_chart: Stacked bar chart for annual net contributions by account.
+- plot_growth_projection_chart: Line chart for portfolio/account growth over time.
+- plot_withdrawals_by_account_chart: Bar chart for withdrawals by account over time.
+- plot_total_withdrawals_chart: Line chart for total withdrawals and tax over time.
+- plot_balances_by_account_chart: Line chart for balances by account over time.
+- plot_total_balance_chart: Line chart for total balance over time.
 """
 
 import altair as alt
@@ -21,6 +18,14 @@ import pandas as pd
 
 
 def plot_pie_chart_breakdown(breakdown: dict[str, float]) -> alt.Chart:
+    """
+    Generate a pie chart showing the breakdown of portfolio or account values.
+
+    Args:
+        breakdown (dict[str, float]): Dictionary of account/type and their values.
+    Returns:
+        alt.Chart: Altair pie chart.
+    """
     if not breakdown:
         return alt.Chart(pd.DataFrame({"Type": [], "Value": []})).mark_arc()
 
@@ -58,6 +63,14 @@ def plot_pie_chart_breakdown(breakdown: dict[str, float]) -> alt.Chart:
 
 
 def plot_annual_contribution_chart(dataframe: pd.DataFrame) -> alt.Chart:
+    """
+    Generate a stacked bar chart of annual net contributions by account.
+
+    Args:
+        dataframe (pd.DataFrame): DataFrame with annual contribution data.
+    Returns:
+        alt.Chart: Altair bar chart.
+    """
     data = dataframe.melt(
         id_vars=["Age"],
         value_vars=[
@@ -91,6 +104,14 @@ def plot_annual_contribution_chart(dataframe: pd.DataFrame) -> alt.Chart:
 
 
 def plot_growth_projection_chart(dataframe: pd.DataFrame) -> alt.Chart:
+    """
+    Generate a line chart showing portfolio and account growth projections over time.
+
+    Args:
+        dataframe (pd.DataFrame): DataFrame with growth projection data.
+    Returns:
+        alt.Chart: Altair line chart.
+    """
     data = dataframe.melt(
         id_vars=["Age"],
         value_vars=[
@@ -124,6 +145,15 @@ def plot_growth_projection_chart(dataframe: pd.DataFrame) -> alt.Chart:
 def plot_withdrawals_by_account_chart(
     dataframe: pd.DataFrame, sub_text: str = "Today"
 ) -> alt.Chart:
+    """
+    Generate a bar chart of withdrawals by account over time.
+
+    Args:
+        dataframe (pd.DataFrame): DataFrame with withdrawal data.
+        sub_text (str): Suffix for column names (e.g., 'Today', 'Inflation Adjusted').
+    Returns:
+        alt.Chart: Altair bar chart.
+    """
     data = dataframe.melt(
         id_vars=["Age"],
         value_vars=[
@@ -160,6 +190,15 @@ def plot_withdrawals_by_account_chart(
 def plot_total_withdrawals_chart(
     dataframe: pd.DataFrame, sub_text: str = "Today"
 ) -> alt.Chart:
+    """
+    Generate a line chart of total withdrawals and tax over time.
+
+    Args:
+        dataframe (pd.DataFrame): DataFrame with withdrawal and tax data.
+        sub_text (str): Suffix for column names (e.g., 'Today', 'Inflation Adjusted').
+    Returns:
+        alt.Chart: Altair line chart.
+    """
     withdrawal_cols = [
         f"Total Withdrawal {sub_text}",
         f"Total Withdrawal After Tax {sub_text}",
@@ -197,6 +236,15 @@ def plot_total_withdrawals_chart(
 def plot_balances_by_account_chart(
     dataframe: pd.DataFrame, sub_text: str = "Today"
 ) -> alt.Chart:
+    """
+    Generate a line chart of balances by account over time.
+
+    Args:
+        dataframe (pd.DataFrame): DataFrame with account balance data.
+        sub_text (str): Suffix for column names (e.g., 'Today', 'Inflation Adjusted').
+    Returns:
+        alt.Chart: Altair line chart.
+    """
     balance_cols = [
         f"LISA Balance {sub_text}",
         f"ISA Balance {sub_text}",
@@ -237,6 +285,15 @@ def plot_balances_by_account_chart(
 def plot_total_balance_chart(
     dataframe: pd.DataFrame, sub_text: str = "Today"
 ) -> alt.Chart:
+    """
+    Generate a line chart of total portfolio balance over time.
+
+    Args:
+        dataframe (pd.DataFrame): DataFrame with total balance data.
+        sub_text (str): Suffix for column names (e.g., 'Today', 'Inflation Adjusted').
+    Returns:
+        alt.Chart: Altair line chart.
+    """
     total_balance_col = f"Total Balance {sub_text}"
 
     if total_balance_col not in dataframe.columns:

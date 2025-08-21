@@ -1,6 +1,34 @@
 """
-Configuration management utilities for Planwise Streamlit app.
-Handles saving, loading, deleting, and listing user session profiles as JSON files.
+User profile management and data structures for Planwise.
+
+This module provides functions and dataclasses for creating, saving, loading, and manipulating user
+financial profiles, including personal details, account balances, contribution settings, and retirement projections.
+
+Classes:
+- QualifyingEarnings: Holds qualifying earnings info for pensions.
+- PersonalDetails: Holds user personal and salary details.
+- ContributionSettings: Holds contribution rates and amounts.
+- AccountBalances: Holds balances for LISA, ISA, SIPP, and workplace pension.
+- Post50ContributionSettings: Holds post-50 contribution redirection info.
+- ExpectedReturnsAndInflation: Holds expected returns and inflation rates.
+- PostRetirementSettings: Holds post-retirement withdrawal and return settings.
+- ProfileSettings: Main profile container for all user settings.
+
+Functions:
+- safe_filename: Sanitizes profile names for filenames.
+- profile_path: Gets the file path for a profile name.
+- list_profiles: Lists all saved profiles.
+- save_profile: Saves a profile to disk.
+- load_profile: Loads a profile from disk.
+- delete_profile: Deletes a profile from disk.
+- serialise_profile_settings_to_json: Serializes a profile to JSON.
+- deserialise_profile_settings_from_json: Deserializes a profile from JSON.
+- get_qualifying_earnings_info: Gets qualifying earnings info for a tax year.
+- get_personal_details: Calculates and returns personal details.
+- get_workplace_contribution_rate: Calculates workplace contribution rate and amount.
+- get_isa_contribution_rate: Calculates ISA contribution rate and amount.
+- get_sipp_contribution_rate: Calculates SIPP contribution rate and amount.
+- get_post_50_contribution_settings: Calculates post-50 contribution settings.
 """
 
 import json
@@ -19,6 +47,14 @@ SAFE_CHARS = re.compile(r"[^A-Za-z0-9 _.-]")
 
 
 def safe_filename(name: str) -> str:
+    """
+    Sanitize a profile name to be safe for use as a filename.
+
+    Args:
+        name (str): Profile name.
+    Returns:
+        str: Sanitized filename string.
+    """
     name = name.strip()
     name = SAFE_CHARS.sub("_", name)
     name = re.sub(r"\s+", " ", name)
@@ -26,24 +62,59 @@ def safe_filename(name: str) -> str:
 
 
 def profile_path(name: str) -> Path:
+    """
+    Get the file path for a given profile name.
+
+    Args:
+        name (str): Profile name.
+    Returns:
+        Path: Path object for the profile file.
+    """
     return PROFILES_DIR / f"{safe_filename(name)}.json"
 
 
 def list_profiles() -> list[str]:
+    """
+    List all saved profile names.
+
+    Returns:
+        list[str]: List of profile names.
+    """
     return sorted(p.stem for p in PROFILES_DIR.glob("*.json"))
 
 
 def save_profile(name: str, profile_settings: "ProfileSettings") -> None:
+    """
+    Save a profile to disk as a JSON file.
+
+    Args:
+        name (str): Profile name.
+        profile_settings (ProfileSettings): Profile settings to save.
+    """
     file_path = profile_path(name)
     serialise_profile_settings_to_json(profile_settings, file_path)
 
 
 def load_profile(name: str) -> Union["ProfileSettings", None]:
+    """
+    Load a profile from disk.
+
+    Args:
+        name (str): Profile name.
+    Returns:
+        ProfileSettings or None: Loaded profile settings or None if not found.
+    """
     p = profile_path(name)
     return deserialise_profile_settings_from_json(p) if p.exists() else None
 
 
 def delete_profile(name: str) -> None:
+    """
+    Delete a profile from disk.
+
+    Args:
+        name (str): Profile name.
+    """
     p = profile_path(name)
     if p.exists():
         p.unlink()
@@ -52,15 +123,14 @@ def delete_profile(name: str) -> None:
 def serialise_profile_settings_to_json(
     profile_settings: "ProfileSettings", file_path: Path
 ) -> None:
-    """Serialise a ProfileSettings object into a JSON file.
-
-    Parameters
-    ----------
-    profile_settings : ProfileSettings
-        The ProfileSettings object to serialise.
-    file_path : str
-        The file path where the JSON file will be saved.
     """
+    Serialize profile settings to a JSON file.
+
+    Args:
+        profile_settings (ProfileSettings): Profile settings to serialize.
+        file_path (Path): Path to save the JSON file.
+    """
+
     data = {
         "tax_year": profile_settings.tax_year,
         "scotland": profile_settings.scotland,
@@ -77,18 +147,15 @@ def serialise_profile_settings_to_json(
 
 
 def deserialise_profile_settings_from_json(file_path: Path) -> "ProfileSettings":
-    """Deserialise a JSON file into a ProfileSettings object.
-
-    Parameters
-    ----------
-    file_path : str
-        The file path of the JSON file to deserialise.
-
-    Returns
-    -------
-    ProfileSettings
-        The deserialised ProfileSettings object.
     """
+    Deserialize profile settings from a JSON file.
+
+    Args:
+        file_path (Path): Path to the JSON file.
+    Returns:
+        ProfileSettings: Deserialized profile settings.
+    """
+
     with open(file_path, "r") as json_file:
         data = json.load(json_file)
 
@@ -114,20 +181,16 @@ def deserialise_profile_settings_from_json(file_path: Path) -> "ProfileSettings"
 def get_qualifying_earnings_info(
     use_qualifying: bool, tax_year: int
 ) -> "QualifyingEarnings":
-    """Get qualifying earnings information for the specified tax year.
-
-    Parameters
-    ----------
-    use_qualifying : bool
-        Whether to use qualifying earnings for calculations.
-    tax_year : int
-        The start year of the tax year (e.g. 2024 for 2024/25).
-
-    Returns
-    -------
-    QualifyingEarnings
-        A dataclass containing qualifying earnings information.
     """
+    Get qualifying earnings information for a given tax year.
+
+    Args:
+        use_qualifying (bool): Whether to use qualifying earnings.
+        tax_year (int): Tax year.
+    Returns:
+        QualifyingEarnings: Qualifying earnings info.
+    """
+
     limits_db = LIMITS_DB[str(tax_year)]
     qualifying_upper = limits_db["qualifying_upper"]
     qualifying_lower = limits_db["qualifying_lower"]
@@ -139,18 +202,14 @@ def get_qualifying_earnings_info(
 
 @dataclass
 class QualifyingEarnings:
-    """Data class to hold qualifying earnings information.
+    """
+    Data class to hold qualifying earnings information for pensions.
 
-    Attributes
-    ----------
-    use_qualifying_earnings : bool
-        Whether to use qualifying earnings for calculations.
-    qualifying_earnings : float
-        The difference between the qualifying upper and lower bounds.
-    qualifying_upper : float
-        The upper bound for qualifying earnings.
-    qualifying_lower : float
-        The lower bound for qualifying earnings.
+    Attributes:
+        use_qualifying_earnings (bool): Whether qualifying earnings are used.
+        qualifying_earnings (float): Amount of qualifying earnings.
+        qualifying_upper (float): Upper threshold for qualifying earnings.
+        qualifying_lower (float): Lower threshold for qualifying earnings.
     """
 
     use_qualifying_earnings: bool
@@ -162,6 +221,19 @@ class QualifyingEarnings:
 def get_personal_details(
     current_age: int, retirement_age: int, salary: float, tax_year: int, scotland: bool
 ) -> "PersonalDetails":
+    """
+    Calculate and return personal details including salary, NI, and tax.
+
+    Args:
+        current_age (int): User's current age.
+        retirement_age (int): Retirement age.
+        salary (float): Gross annual salary.
+        tax_year (int): Tax year.
+        scotland (bool): Whether user is in Scotland.
+    Returns:
+        PersonalDetails: Personal details data class.
+    """
+
     ni_contribution = calculate_ni(salary, year=tax_year, category="category_a")
     income_tax = calculate_income_tax(salary, year=tax_year, scotland=scotland)
     take_home_salary = salary - ni_contribution - income_tax
@@ -177,7 +249,8 @@ def get_personal_details(
 
 @dataclass
 class PersonalDetails:
-    """Data class to hold personal details inputs from the user.
+    """
+    Data class to hold personal details inputs from the user.
 
     Attributes
     ----------
@@ -209,6 +282,17 @@ def get_workplace_contribution_rate(
     qualifying_earnings: "QualifyingEarnings",
     use_exact_amount: bool = False,
 ) -> tuple[float, float]:
+    """
+    Calculate workplace pension contribution rate and amount.
+
+    Args:
+        workplace_contribution (float): Contribution rate or amount.
+        personal_details (PersonalDetails): User's personal details.
+        qualifying_earnings (QualifyingEarnings): Qualifying earnings info.
+        use_exact_amount (bool): If True, use exact amount; else use rate.
+    Returns:
+        tuple[float, float]: (rate, contribution amount)
+    """
     if not use_exact_amount:
         if qualifying_earnings.use_qualifying_earnings:
             potential_contribution_amount = (
@@ -236,6 +320,16 @@ def get_isa_contribution_rate(
     personal_details: "PersonalDetails",
     use_exact_amount: bool = False,
 ) -> tuple[float, float]:
+    """
+    Calculate ISA contribution rate and amount.
+
+    Args:
+        isa_contribution (float): Contribution rate or amount.
+        personal_details (PersonalDetails): User's personal details.
+        use_exact_amount (bool): If True, use exact amount; else use rate.
+    Returns:
+        tuple[float, float]: (rate, contribution amount)
+    """
     if not use_exact_amount:
         contribution = isa_contribution * personal_details.take_home_salary
         rate = isa_contribution
@@ -255,6 +349,16 @@ def get_sipp_contribution_rate(
     personal_details: "PersonalDetails",
     use_exact_amount: bool = False,
 ) -> tuple[float, float]:
+    """
+    Calculate SIPP contribution rate and amount.
+
+    Args:
+        sipp_contribution (float): Contribution rate or amount.
+        personal_details (PersonalDetails): User's personal details.
+        use_exact_amount (bool): If True, use exact amount; else use rate.
+    Returns:
+        tuple[float, float]: (rate, contribution amount)
+    """
     if not use_exact_amount:
         contribution = sipp_contribution * personal_details.take_home_salary
         rate = sipp_contribution
@@ -271,39 +375,25 @@ def get_sipp_contribution_rate(
 
 @dataclass
 class ContributionSettings:
-    """Data class to hold contribution settings.
-    Attributes
-    ----------
-    workplace_er_rate: float
-        The employer's contribution rate to the workplace pension.
-    workplace_er_contribution: float
-        The amount contributed by the employer to the workplace pension.
-    workplace_ee_rate: float
-        The employee's contribution rate to the workplace pension.
-    workplace_ee_contribution: float
-        The amount contributed by the employee to the workplace pension.
-    lisa_rate: float
-        The contribution rate to the Lifetime ISA (LISA).
-    lisa_contribution: float
-        The amount contributed to the LISA.
-    isa_rate: float
-        The contribution rate to the Individual Savings Account (ISA).
-    isa_contribution: float
-        The amount contributed to the ISA.
-    sipp_rate: float
-        The contribution rate to the Self-Invested Personal Pension (SIPP).
-    sipp_contribution: float
-        The amount contributed to the SIPP.
-    total_workplace_contribution: float
-        The total contribution to the workplace pension (employer + employee).
-    total_sipp_contribution: float
-        The total contribution to the SIPP.
-    total_isa_contribution: float
-        The total contribution to the ISA (including LISA).
-    total_net_contribution: float
-        The total net contribution made by the user across all accounts.
-    total_pension_contribution: float
-        The total pension contribution made by the user across pension accounts.
+    """
+    Data class to hold contribution rates and amounts for all accounts.
+
+    Attributes:
+        workplace_er_rate (float): Employer rate.
+        workplace_er_contribution (float): Employer contribution amount.
+        workplace_ee_rate (float): Employee rate.
+        workplace_ee_contribution (float): Employee contribution amount.
+        lisa_rate (float): LISA rate.
+        lisa_contribution (float): LISA contribution amount.
+        isa_rate (float): ISA rate.
+        isa_contribution (float): ISA contribution amount.
+        sipp_rate (float): SIPP rate.
+        sipp_contribution (float): SIPP contribution amount.
+        total_workplace_contribution (float): Total workplace contribution.
+        total_sipp_contribution (float): Total SIPP contribution.
+        total_isa_contribution (float): Total ISA contribution.
+        total_net_contribution (float): Total net contribution.
+        total_pension_contribution (float): Total pension contribution.
     """
 
     workplace_er_rate: float
@@ -325,18 +415,14 @@ class ContributionSettings:
 
 @dataclass
 class AccountBalances:
-    """Data class to hold account balances.
+    """
+    Data class to hold account balances.
 
-    Attributes
-    ----------
-    lisa_balance: float
-        The current balance in the Lifetime ISA (LISA).
-    isa_balance: float
-        The current balance in the Individual Savings Account (ISA).
-    sipp_balance: float
-        The current balance in the Self-Invested Personal Pension (SIPP).
-    workplace_pension_balance: float
-        The current balance in the workplace pension.
+    Attributes:
+        lisa_balance (float): The current balance in the Lifetime ISA (LISA).
+        isa_balance (float): The current balance in the Individual Savings Account (ISA).
+        sipp_balance (float): The current balance in the Self-Invested Personal Pension (SIPP).
+        workplace_pension_balance (float): The current balance in the workplace pension.
     """
 
     lisa_balance: float
@@ -350,6 +436,16 @@ def get_post_50_contribution_settings(
     redirectable_to_isa_contribution: float,
     lisa_contribution: float,
 ) -> "Post50ContributionSettings":
+    """
+    Calculate post-50 contribution settings for LISA redirection.
+
+    Args:
+        use_exact_amount_post50 (bool): If True, use exact amount; else use rate.
+        redirectable_to_isa_contribution (float): Amount or rate to redirect to ISA.
+        lisa_contribution (float): LISA contribution amount.
+    Returns:
+        Post50ContributionSettings: Post-50 contribution settings data class.
+    """
     if not use_exact_amount_post50:
         post_50_lisa_to_isa_rate = redirectable_to_isa_contribution
         post_50_lisa_to_isa_contribution = post_50_lisa_to_isa_rate * lisa_contribution
@@ -382,18 +478,14 @@ def get_post_50_contribution_settings(
 
 @dataclass
 class Post50ContributionSettings:
-    """Data class to hold post-50 contribution settings.
+    """
+    Data class to hold post-50 contribution settings.
 
-    Attributes
-    ----------
-    post_50_lisa_to_isa_rate: float
-        The rate at which LISA contributions can be redirected to ISA after age 50.
-    post_50_lisa_to_isa_contribution: float
-        The amount redirected from LISA to ISA after age 50.
-    post_50_lisa_to_sipp_rate: float
-        The rate at which LISA contributions can be redirected to SIPP after age 50.
-    post_50_lisa_to_sipp_contribution: float
-        The amount redirected from LISA to SIPP after age 50.
+    Attributes:
+        post_50_lisa_to_isa_rate (float): Rate for LISA to ISA redirection after age 50.
+        post_50_lisa_to_isa_contribution (float): Amount redirected from LISA to ISA.
+        post_50_lisa_to_sipp_rate (float): Rate for LISA to SIPP redirection after age 50.
+        post_50_lisa_to_sipp_contribution (float): Amount redirected from LISA to SIPP.
     """
 
     post_50_lisa_to_isa_rate: float
@@ -404,20 +496,15 @@ class Post50ContributionSettings:
 
 @dataclass
 class ExpectedReturnsAndInflation:
-    """Data class to hold expected returns and inflation rates.
+    """
+    Data class to hold expected returns and inflation rates.
 
-    Attributes
-    ----------
-    expected_lisa_annual_return: float
-        The expected annual return rate for the LISA account.
-    expected_isa_annual_return: float
-        The expected annual return rate for the ISA account.
-    expected_sipp_annual_return: float
-        The expected annual return rate for the SIPP account.
-    expected_workplace_annual_return: float
-        The expected annual return rate for the workplace pension account.
-    expected_inflation: float
-        The expected annual inflation rate.
+    Attributes:
+        expected_lisa_annual_return (float): Expected annual return for LISA.
+        expected_isa_annual_return (float): Expected annual return for ISA.
+        expected_sipp_annual_return (float): Expected annual return for SIPP.
+        expected_workplace_annual_return (float): Expected annual return for workplace pension.
+        expected_inflation (float): Expected annual inflation rate.
     """
 
     expected_lisa_annual_return: float
@@ -429,34 +516,22 @@ class ExpectedReturnsAndInflation:
 
 @dataclass
 class PostRetirementSettings:
-    """Data class to hold post-retirement settings.
+    """
+    Data class to hold post-retirement withdrawal and return settings.
 
-    Attributes
-    ----------
-    withdrawal_today_amount: float
-        The amount to withdraw today from the retirement accounts.
-    expected_post_retirement_lisa_annual_return: float
-        The expected annual return rate for the LISA account after retirement.
-    expected_post_retirement_isa_annual_return: float
-        The expected annual return rate for the ISA account after retirement.
-    expected_post_retirement_pension_annual_return: float
-        The expected annual return rate for the pension account after retirement.
-    postret_lisa_withdrawal_age: int
-        The age at which the user plans to start withdrawing from the LISA account.
-    postret_lisa_targeted_withdrawal_percentage: float
-        The targeted percentage of the LISA account to withdraw after retirement.
-    postret_isa_withdrawal_age: int
-        The age at which the user plans to start withdrawing from the ISA account.
-    postret_isa_targeted_withdrawal_percentage: float
-        The targeted percentage of the ISA account to withdraw after retirement.
-    postret_taxfree_pension_withdrawal_age: int
-        The age at which the user plans to start withdrawing tax-free from the pension account.
-    postret_taxfree_pension_targeted_withdrawal_percentage: float
-        The targeted percentage of the pension account to withdraw tax-free after retirement.
-    postret_taxable_pension_withdrawal_age: int
-        The age at which the user plans to start withdrawing taxable from the pension account.
-    postret_taxable_pension_targeted_withdrawal_percentage: float
-        The targeted percentage of the pension account to withdraw taxable after retirement.
+    Attributes:
+        withdrawal_today_amount (float): Annual withdrawal amount in today's money.
+        expected_post_retirement_lisa_annual_return (float): Expected post-retirement LISA return.
+        expected_post_retirement_isa_annual_return (float): Expected post-retirement ISA return.
+        expected_post_retirement_pension_annual_return (float): Expected post-retirement pension return.
+        postret_lisa_withdrawal_age (int): Age to start LISA withdrawals.
+        postret_lisa_targeted_withdrawal_percentage (float): Targeted LISA withdrawal percentage.
+        postret_isa_withdrawal_age (int): Age to start ISA withdrawals.
+        postret_isa_targeted_withdrawal_percentage (float): Targeted ISA withdrawal percentage.
+        postret_taxfree_pension_withdrawal_age (int): Age to start tax-free pension withdrawals.
+        postret_taxfree_pension_targeted_withdrawal_percentage (float): Targeted tax-free pension withdrawal percentage.
+        postret_taxable_pension_withdrawal_age (int): Age to start taxable pension withdrawals.
+        postret_taxable_pension_targeted_withdrawal_percentage (float): Targeted taxable pension withdrawal percentage.
     """
 
     withdrawal_today_amount: float
@@ -475,29 +550,19 @@ class PostRetirementSettings:
 
 @dataclass
 class ProfileSettings:
-    """Data class to hold all profile settings for the Planwise application.
+    """
+    Main data class to hold all user profile settings for Planwise.
 
-    Attributes
-    ----------
-    tax_year : int
-        The tax year for which the profile settings apply.
-    scotland : bool
-        Whether the profile is for a user in Scotland.
-    qualifying_earnings : QualifyingEarnings
-        The qualifying earnings information for the user.
-    personal_details : PersonalDetails
-        The personal details of the user, including salary and take-home salary.
-    contribution_settings : ContributionSettings
-        The contribution settings for the user, including rates and amounts.
-    account_balances : AccountBalances
-        The current balances of the user's accounts, including LISA, ISA, SIPP, and
-        workplace pension.
-    post_50_contribution_settings : Post50ContributionSettings
-        The contribution settings for the user after age 50.
-    expected_returns_and_inflation : ExpectedReturnsAndInflation
-        The expected returns and inflation rates for the user's investments.
-    post_retirement_settings : PostRetirementSettings
-        The post-retirement settings for the user, including withdrawal strategies.
+    Attributes:
+        tax_year (int): Tax year for calculations.
+        scotland (bool): Whether user is in Scotland.
+        qualifying_earnings (QualifyingEarnings): Qualifying earnings info.
+        personal_details (PersonalDetails): User's personal details.
+        contribution_settings (ContributionSettings): Contribution settings.
+        account_balances (AccountBalances): Account balances.
+        post_50_contribution_settings (Post50ContributionSettings): Post-50 contribution settings.
+        expected_returns_and_inflation (ExpectedReturnsAndInflation): Expected returns and inflation.
+        post_retirement_settings (PostRetirementSettings): Post-retirement settings.
     """
 
     tax_year: int
